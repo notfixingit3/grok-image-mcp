@@ -2,7 +2,7 @@
 
 This report documents integration tests and **release proof images** — real Grok Imagine output from the tagged version, saved under `assets/releases/<tag>/`.
 
-## Version: `v0.2.0-beta.1` (dev)
+## Version: `v0.2.0` (main)
 - **Build Date**: 2026-06-08
 - **Platform**: macOS arm64 (`darwin/arm64`)
 - **Go Version**: `go1.22+`
@@ -11,30 +11,30 @@ This report documents integration tests and **release proof images** — real Gr
 
 ---
 
-## Release Proof — `v0.2.0-beta.1`
+## Release Proof — `v0.2.0`
 
 Live images generated through the MCP server (generate → continue_editing) with OAuth — no `XAI_API_KEY`.
 
 | Step | File |
 |---|---|
-| `generate_image` | [assets/releases/v0.2.0-beta.1/generated.jpg](assets/releases/v0.2.0-beta.1/generated.jpg) |
-| `continue_editing` | [assets/releases/v0.2.0-beta.1/edited.jpg](assets/releases/v0.2.0-beta.1/edited.jpg) |
-| Metadata | [assets/releases/v0.2.0-beta.1/manifest.json](assets/releases/v0.2.0-beta.1/manifest.json) |
+| `generate_image` | [assets/releases/v0.2.0/generated.jpg](assets/releases/v0.2.0/generated.jpg) |
+| `continue_editing` | [assets/releases/v0.2.0/edited.jpg](assets/releases/v0.2.0/edited.jpg) |
+| Metadata | [assets/releases/v0.2.0/manifest.json](assets/releases/v0.2.0/manifest.json) |
 
 <p align="center">
   <strong>Generated</strong><br/>
-  <img src="assets/releases/v0.2.0-beta.1/generated.jpg" alt="v0.2.0-beta.1 release proof — generated" width="360" />
+  <img src="assets/releases/v0.2.0/generated.jpg" alt="v0.2.0 release proof — generated" width="360" />
 </p>
 
 <p align="center">
   <strong>Edited (continue_editing)</strong><br/>
-  <img src="assets/releases/v0.2.0-beta.1/edited.jpg" alt="v0.2.0-beta.1 release proof — edited" width="360" />
+  <img src="assets/releases/v0.2.0/edited.jpg" alt="v0.2.0 release proof — edited" width="360" />
 </p>
 
 Regenerate before tagging a release:
 
 ```bash
-./scripts/generate_release_proof.sh v0.2.0-beta.1   # fresh images + manifest
+./scripts/generate_release_proof.sh v0.2.0   # fresh images + manifest
 # or after ./scripts/test_all.sh (reuses latest outputs):
 ./scripts/generate_release_proof.sh --reuse-latest
 ```
@@ -68,7 +68,7 @@ Regenerate before tagging a release:
 **Result: PASSED**
 
 Verified:
-- MCP `initialize` returns `grok-image-mcp` v0.2.0-beta.1
+- MCP `initialize` returns `grok-image-mcp` v0.2.0
 - `tools/list` exposes all 6 expected tools
 - `get_configuration_status` works with and without credentials
 - Grok OAuth detected when `~/.grok/auth.json` is present
@@ -76,7 +76,7 @@ Verified:
 - Legacy Gemini tool `generate_imagen` is correctly rejected
 - `edit_image` rejects unsupported formats and files over 20 MiB before calling xAI
 - Mock mode works without any credentials
-- `--version` reports `0.2.0-beta.1`
+- `--version` reports `0.2.0`
 
 ## Unit Tests
 
@@ -134,7 +134,7 @@ Verified end-to-end:
 - `get_last_image_info` — path matches in persistent session
 - `continue_editing` — real edit saved
 - `edit_image` — explicit-path edit succeeded
-- Release proof saved to `assets/releases/v0.2.0-beta.1/`
+- Release proof saved to `assets/releases/v0.2.0/`
 
 API-key-only accounts without credits may still see HTTP 403; the server surfaces a link to [console.x.ai](https://console.x.ai).
 
@@ -147,7 +147,7 @@ API-key-only accounts without credits may still see HTTP 403; the server surface
 | Go conversion from nano-banana-mcpv2 | ✅ Complete |
 | Documentation updated | ✅ Complete |
 | Grok subscription OAuth | ✅ Complete |
-| Release proof images (`assets/releases/`) | ✅ v0.2.0-beta.1 |
+| Release proof images (`assets/releases/`) | ✅ v0.2.0 |
 | MCP protocol / stdio tests | ✅ Passed |
 | Go unit tests | ✅ Passed |
 | Mock integration tests | ✅ Passed |

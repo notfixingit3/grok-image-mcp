@@ -76,7 +76,7 @@ unset XAI_API_KEY || true
 
 echo "🔧 --version flag"
 VERSION=$(./grok-image-mcp --version)
-echo "$VERSION" | grep -q '0\.2\.0-beta\.1' || { echo "❌ unexpected version: $VERSION"; exit 1; }
+echo "$VERSION" | grep -q '0\.2\.0' || { echo "❌ unexpected version: $VERSION"; exit 1; }
 echo "✅ --version ($VERSION)"
 
 echo "🔧 empty prompt rejected"

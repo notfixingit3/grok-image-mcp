@@ -5,7 +5,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.0] - 2026-06-08
+
+Stable release promoting `v0.2.0-beta.1` from `dev`.
 
 ### Added
 - **Hermes Agent** client integration docs and examples (`hermes-oauth-live.yaml`, `hermes-mock.yaml`).

@@ -19,7 +19,7 @@ import (
 
 const (
 	ServerName    = "grok-image-mcp"
-	ServerVersion = "0.2.0-beta.1"
+	ServerVersion = "0.2.0"
 	XAIBaseURL    = "https://api.x.ai/v1"
 )
 
