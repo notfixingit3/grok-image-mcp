@@ -26,8 +26,9 @@ done
 echo "✅ tools/list"
 
 echo "🔧 get_configuration_status (unconfigured)"
-unset XAI_API_KEY || true
-RESP=$(call_rpc '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_configuration_status","arguments":{}},"id":2}')
+ISOLATED_HOME=$(mktemp -d)
+trap 'rm -rf "$ISOLATED_HOME" "$BIG_FILE" "$BAD_FORMAT_FILE"' EXIT
+RESP=$(HOME="$ISOLATED_HOME" GROK_IMAGE_AUTH=api_key GROK_AUTH_JSON="$ISOLATED_HOME/no-auth.json" call_rpc '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_configuration_status","arguments":{}},"id":2}')
 echo "$RESP" | grep -q 'not configured' || exit 1
 echo "✅ get_configuration_status unconfigured"
 
@@ -58,7 +59,7 @@ echo "✅ edit_image format validation"
 echo "🔧 edit_image rejects oversized file without API call"
 BIG_FILE="/tmp/grok-image-mcp-oversized.jpg"
 dd if=/dev/zero of="$BIG_FILE" bs=1m count=21 status=none 2>/dev/null || dd if=/dev/zero of="$BIG_FILE" bs=1048576 count=21 2>/dev/null
-trap 'rm -f "$BIG_FILE" "$BAD_FORMAT_FILE"' EXIT
+
 RESP=$(call_rpc "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"edit_image\",\"arguments\":{\"imagePath\":\"$BIG_FILE\",\"prompt\":\"test\"}},\"id\":7}")
 echo "$RESP" | grep -q '20 MiB' || exit 1
 echo "✅ edit_image size validation"
@@ -75,7 +76,7 @@ unset XAI_API_KEY || true
 
 echo "🔧 --version flag"
 VERSION=$(./grok-image-mcp --version)
-echo "$VERSION" | grep -q '0\.2\.0-beta' || { echo "❌ unexpected version: $VERSION"; exit 1; }
+echo "$VERSION" | grep -q '0\.2\.0-beta\.1' || { echo "❌ unexpected version: $VERSION"; exit 1; }
 echo "✅ --version ($VERSION)"
 
 echo "🔧 empty prompt rejected"
@@ -107,6 +108,18 @@ echo "✅ mock configure_xai_token"
 
 unset GROK_IMAGE_MOCK || true
 unset XAI_API_KEY || true
+
+if [ -f "$HOME/.grok/auth.json" ]; then
+  echo "🔧 grok oauth: get_configuration_status without API key"
+  unset XAI_API_KEY || true
+  unset GROK_IMAGE_AUTH || true
+  unset GROK_AUTH_JSON || true
+  RESP=$(call_rpc '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_configuration_status","arguments":{}},"id":14}')
+  echo "$RESP" | grep -q 'Grok subscription OAuth is active' || exit 1
+  echo "✅ grok oauth configuration detected"
+else
+  echo "⏭️  skipping grok oauth test (no ~/.grok/auth.json)"
+fi
 
 echo ""
 echo "🎉 Protocol tests passed."

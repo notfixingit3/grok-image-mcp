@@ -6,10 +6,13 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
-if [ -z "${XAI_API_KEY:-}" ]; then
-  echo "❌ Error: XAI_API_KEY environment variable is not set."
+if [ -z "${XAI_API_KEY:-}" ] && [ ! -f "${GROK_AUTH_JSON:-$HOME/.grok/auth.json}" ]; then
+  echo "❌ Error: no live credentials found."
+  echo "   Set XAI_API_KEY or run 'grok login' (SuperGrok / X Premium+ OAuth)."
   exit 1
 fi
+
+unset GROK_IMAGE_MOCK || true
 
 call_tool() {
   local name="$1"
@@ -52,29 +55,34 @@ echo "✅ All expected tools present"
 echo "🔧 Testing get_configuration_status..."
 STATUS_RESPONSE=$(call_tool "get_configuration_status" '{}' 3)
 assert_no_error "$STATUS_RESPONSE" "get_configuration_status"
-echo "$STATUS_RESPONSE" | grep -q 'configured and ready' || { echo "❌ API key not detected"; exit 1; }
+echo "$STATUS_RESPONSE" | grep -qE 'configured and ready|Grok subscription OAuth is active' || { echo "❌ Live credentials not detected"; exit 1; }
 
-echo "🎨 Testing generate_image..."
-GEN_RESPONSE=$(call_tool "generate_image" '{"prompt":"A minimal abstract logo mark: a glowing picture frame with flowing light trails, electric blue on deep black, clean vector style, no text","model":"grok-imagine-image","aspectRatio":"1:1","resolution":"1k"}' 4)
+echo "🎨 Testing generate_image + get_last_image_info + continue_editing (single session)..."
+SESSION_OUTPUT=$(./grok-image-mcp 2>/dev/null <<'EOF'
+{"jsonrpc":"2.0","method":"tools/call","params":{"name":"generate_image","arguments":{"prompt":"A minimal abstract logo mark: a glowing picture frame with flowing light trails, electric blue on deep black, clean vector style, no text","model":"grok-imagine-image","aspectRatio":"1:1","resolution":"1k"}},"id":4}
+{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_last_image_info","arguments":{}},"id":5}
+{"jsonrpc":"2.0","method":"tools/call","params":{"name":"continue_editing","arguments":{"prompt":"Add a subtle soft purple outer glow around the frame while keeping the same composition","model":"grok-imagine-image"}},"id":6}
+EOF
+)
+GEN_RESPONSE=$(echo "$SESSION_OUTPUT" | sed -n '1p')
+INFO_RESPONSE=$(echo "$SESSION_OUTPUT" | sed -n '2p')
+EDIT_RESPONSE=$(echo "$SESSION_OUTPUT" | sed -n '3p')
+
 assert_no_error "$GEN_RESPONSE" "generate_image"
 echo "$GEN_RESPONSE" | grep -q 'Image generated with Grok Imagine' || { echo "❌ Unexpected generate response"; exit 1; }
 
-LAST_IMAGE=$(ls -t generated_imgs/generated-*.png generated_imgs/generated-*.jpg generated_imgs/generated-*.webp 2>/dev/null | head -1)
+LAST_IMAGE=$(ls -t generated_imgs/generated-* 2>/dev/null | head -1)
 if [ -z "$LAST_IMAGE" ] || [ ! -f "$LAST_IMAGE" ]; then
   echo "❌ No generated image file found in generated_imgs/"
   exit 1
 fi
 echo "✅ Generated image saved: $LAST_IMAGE"
 
-echo "🔧 Testing get_last_image_info..."
-INFO_RESPONSE=$(call_tool "get_last_image_info" '{}' 5)
 assert_no_error "$INFO_RESPONSE" "get_last_image_info"
 echo "$INFO_RESPONSE" | grep -q "$LAST_IMAGE" || { echo "❌ Last image path mismatch"; exit 1; }
 
-echo "🎨 Testing continue_editing..."
-EDIT_RESPONSE=$(call_tool "continue_editing" '{"prompt":"Add a subtle soft purple outer glow around the frame while keeping the same composition","model":"grok-imagine-image"}' 6)
 assert_no_error "$EDIT_RESPONSE" "continue_editing"
-EDITED_IMAGE=$(ls -t generated_imgs/edited-*.png generated_imgs/edited-*.jpg generated_imgs/edited-*.webp 2>/dev/null | head -1)
+EDITED_IMAGE=$(ls -t generated_imgs/edited-* 2>/dev/null | head -1)
 if [ -z "$EDITED_IMAGE" ] || [ ! -f "$EDITED_IMAGE" ]; then
   echo "❌ No edited image file found"
   exit 1

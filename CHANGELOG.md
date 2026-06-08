@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0-beta.1] - 2026-06-08
+
+### Added
+- **Grok subscription OAuth** — auto-reads `~/.grok/auth.json` from `grok login` (SuperGrok / X Premium+).
+- OAuth token refresh via `https://auth.x.ai/oauth2/token` when the session is near expiry.
+- `GROK_IMAGE_AUTH` (`auto` / `oauth` / `api_key`) and `GROK_AUTH_JSON` environment variables.
+- Example config [examples/grok-oauth-live.toml](examples/grok-oauth-live.toml) for keyless live mode.
+
+### Changed
+- Credential priority in `auto` mode: Grok OAuth → `XAI_API_KEY` → config file.
+- `get_configuration_status` and setup wizard report OAuth subscription state.
+- Error messages mention `grok login` as an alternative to API keys.
+
 ## [0.2.0-beta.0] - 2026-06-08
 
 ### Added

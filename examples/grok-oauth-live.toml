@@ -1,0 +1,10 @@
+# Grok Build — live mode via subscription OAuth (no API key)
+# Prerequisite: run `grok login` once (stores ~/.grok/auth.json)
+
+[mcp_servers.grok-image-mcp]
+command = "/path/to/grok-image-mcp"
+enabled = true
+
+# No env vars needed — server reads ~/.grok/auth.json automatically.
+# Optional: force OAuth-only (ignore XAI_API_KEY if set)
+# env = { GROK_IMAGE_AUTH = "oauth", GROK_IMAGE_MODEL = "grok-imagine-image-quality" }

@@ -34,15 +34,15 @@ Adapted from [nano-banana-mcpv2](https://github.com/notfixingit3/nano-banana-mcp
 
 ## Two Modes — Both Supported
 
-| | **Mock mode** (free) | **Live mode** (xAI credits) |
-|---|---|---|
-| **Enable** | `GROK_IMAGE_MOCK=1` | `XAI_API_KEY=...` |
-| **API calls** | None | xAI Grok Imagine |
-| **Cost** | Free | ~$0.02–$0.05 / image |
-| **Use case** | Dev, testing, MCP wiring | Real image generation |
-| **Config examples** | [examples/](examples/) (per-client) | [examples/cursor-mcp-live.json](examples/cursor-mcp-live.json) |
+| | **Mock mode** (free) | **Live — subscription OAuth** | **Live — API key** |
+|---|---|---|---|
+| **Enable** | `GROK_IMAGE_MOCK=1` | `grok login` (uses `~/.grok/auth.json`) | `XAI_API_KEY=...` |
+| **API calls** | None | xAI Grok Imagine | xAI Grok Imagine |
+| **Cost** | Free | Uses SuperGrok / X Premium+ quota | ~$0.02–$0.05 / image |
+| **Use case** | Dev, testing, MCP wiring | Subscribers — no API key needed | Pay-as-you-go / teams |
+| **Config examples** | [examples/](examples/) (per-client) | [grok-oauth-live.toml](examples/grok-oauth-live.toml) | [cursor-mcp-live.json](examples/cursor-mcp-live.json) |
 
-Switch anytime: unset `GROK_IMAGE_MOCK` and add your key when you're ready for live generation.
+Switch anytime: unset `GROK_IMAGE_MOCK` when you're ready for live generation. Subscription users can skip API keys entirely.
 
 ```bash
 # Free — works right now
@@ -50,7 +50,12 @@ export GROK_IMAGE_MOCK=1
 go build -o grok-image-mcp .
 ./scripts/test_mock.sh
 
-# Live — when you have xAI credits
+# Live — SuperGrok / X Premium+ subscribers (no API key)
+grok login   # once — stores OAuth in ~/.grok/auth.json
+unset GROK_IMAGE_MOCK
+./scripts/test_all.sh   # auto-detects OAuth
+
+# Live — pay-as-you-go API key
 export XAI_API_KEY="your-key"
 unset GROK_IMAGE_MOCK
 ./scripts/test_all.sh
@@ -303,11 +308,35 @@ Restart Windsurf / reload MCP. Example: [windsurf-mcp.json](examples/windsurf-mc
 
 ---
 
+## Grok Subscription OAuth
+
+If you have **SuperGrok** or **X Premium+**, you can use your existing Grok login — no `XAI_API_KEY` required.
+
+1. Run `grok login` once (stores credentials in `~/.grok/auth.json`)
+2. Configure the MCP server normally — **no key in env**
+3. The server auto-detects OAuth and uses your subscription session for image generation
+
+Credential priority (`GROK_IMAGE_AUTH`, default `auto`):
+
+1. Grok OAuth (`~/.grok/auth.json`) — subscription quota
+2. `XAI_API_KEY` environment variable — pay-as-you-go
+3. `~/.grok-image-config.json` — saved via `configure_xai_token`
+
+Force API-key-only mode: `GROK_IMAGE_AUTH=api_key`. Force OAuth-only: `GROK_IMAGE_AUTH=oauth`.
+
+Check status with the `get_configuration_status` tool — it reports `Grok subscription OAuth is active` when OAuth is in use.
+
+> **Note:** Some subscription tiers may return HTTP 403 on OAuth API access. If that happens, fall back to `XAI_API_KEY` from [console.x.ai](https://console.x.ai).
+
+---
+
 ## Environment Variables
 
 | Variable | Required | Description |
 |---|---|---|
-| `XAI_API_KEY` | Live mode | xAI API key from [console.x.ai](https://console.x.ai) |
+| `XAI_API_KEY` | Live (API key mode) | xAI API key from [console.x.ai](https://console.x.ai) |
+| `GROK_IMAGE_AUTH` | No | `auto` (default), `oauth`, or `api_key` |
+| `GROK_AUTH_JSON` | No | Path to Grok OAuth store (default: `~/.grok/auth.json`) |
 | `GROK_IMAGE_MOCK` | No | Set to `1` for free offline mock mode |
 | `GROK_IMAGE_MODEL` | No | Default model (`grok-imagine-image-quality`) |
 | `GROK_IMAGES_DIR` | No | Custom output directory for saved images |
@@ -387,7 +416,8 @@ Docker MCP config (mock — no credits):
 | **HTTP 403 — no credits/licenses** | Add credits at [console.x.ai](https://console.x.ai). The server surfaces this with a direct link. |
 | **HTTP 429 — rate limit** | Server retries automatically (up to 3 attempts). Wait and retry, or use `serviceTier: "default"`. |
 | **Tools not visible in client** | Confirm binary path is absolute, restart/reload MCP, run `grok mcp doctor grok-image-mcp` (Grok Build). |
-| **No xAI key yet** | Use mock mode: `GROK_IMAGE_MOCK=1` or `./grok-image-mcp --mock`. Run `./scripts/test_mock.sh` to verify. |
+| **No xAI key yet** | Use mock mode: `GROK_IMAGE_MOCK=1` or `./grok-image-mcp --mock`. Subscribers: run `grok login` instead. |
+| **OAuth 403 after login** | Some tiers lack OAuth API access — set `XAI_API_KEY` or `GROK_IMAGE_AUTH=api_key`. |
 | **Empty or invalid tool args** | v0.2+ validates prompts, enums, and ranges before calling xAI — check the error message. |
 
 **Pricing (live mode):** `grok-imagine-image` ~$0.02/image · `grok-imagine-image-quality` ~$0.05/image. See [xAI Imagine docs](https://docs.x.ai/developers/model-capabilities/imagine).

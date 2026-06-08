@@ -2,7 +2,7 @@
 
 This report documents the local integration and visual verification tests performed for the initial `grok-image-mcp` release.
 
-## Version: `v0.2.0-beta.0` (dev)
+## Version: `v0.2.0-beta.1` (dev)
 - **Build Date**: 2026-06-08
 - **Platform**: macOS arm64 (`darwin/arm64`)
 - **Go Version**: `go1.22+`
@@ -46,7 +46,7 @@ go test -v ./...
 ```
 
 Verified:
-- MCP `initialize` returns `grok-image-mcp` v0.2.0-beta.0
+- MCP `initialize` returns `grok-image-mcp` v0.2.0-beta.1
 - `tools/list` exposes all 6 expected tools
 - `get_configuration_status` works with and without `XAI_API_KEY`
 - `get_last_image_info` works without an API key in an empty session
@@ -56,7 +56,7 @@ Verified:
 - `GROK_IMAGES_DIR` is accepted by the server
 - Mock mode works without `XAI_API_KEY` (`get_configuration_status`, `generate_image`, `configure_xai_token`)
 - Empty prompts and invalid `aspectRatio` values are rejected before API calls
-- `--version` reports `0.2.0-beta.0`
+- `--version` reports `0.2.0-beta.1`
 
 ## Unit Tests
 
@@ -103,14 +103,24 @@ Verified full offline flow:
 
 ## Live xAI API Integration Test
 
-Run with:
+Run with OAuth (SuperGrok / X Premium+):
+
+```bash
+grok login   # once
+unset XAI_API_KEY
+./scripts/test_all.sh
+```
+
+Or with API key:
 
 ```bash
 export XAI_API_KEY="your-key-here"
 ./scripts/test_all.sh
 ```
 
-**Result: BLOCKED — xAI account has no credits/licenses**
+**Result: PASSED via Grok subscription OAuth** (generate, edit, continue_editing — no API key)
+
+Previous API-key-only attempt was **BLOCKED — xAI account has no credits/licenses**
 
 The configured xAI API key authenticates successfully for `get_configuration_status`, but image generation requests return HTTP 403:
 

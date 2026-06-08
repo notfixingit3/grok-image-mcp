@@ -19,7 +19,7 @@ import (
 
 const (
 	ServerName    = "grok-image-mcp"
-	ServerVersion = "0.2.0-beta.0"
+	ServerVersion = "0.2.0-beta.1"
 	XAIBaseURL    = "https://api.x.ai/v1"
 )
 
@@ -445,22 +445,27 @@ func handleToolCall(id interface{}, toolName string, arguments json.RawMessage) 
 	}
 
 	if toolName == "get_configuration_status" {
+		_, source := loadConfig()
 		isConfigured := apiKey != ""
-		statusText := "❌ xAI API token is not configured"
-		sourceInfo := "\n\n📝 Configuration options:\n1. Environment variable: XAI_API_KEY\n2. Use configure_xai_token tool"
+		statusText := "❌ xAI credentials are not configured"
+		sourceInfo := "\n\n📝 Configuration options:\n1. Grok subscription: run `grok login` (uses ~/.grok/auth.json)\n2. Environment variable: XAI_API_KEY\n3. Use configure_xai_token tool"
 		if isMockMode() {
 			statusText = "🧪 Mock mode is active — image tools work offline without xAI credits"
 			sourceInfo = "\n📍 Set GROK_IMAGE_MOCK=1 or run with --mock to enable"
 			if isConfigured {
-				sourceInfo += "\n📍 API key is also configured for when you disable mock mode"
+				sourceInfo += "\n📍 Live credentials are also available for when you disable mock mode"
+				if desc := credentialSourceDescription(source); desc != "" {
+					sourceInfo += "\n📍 " + desc
+				}
 			}
 		} else if isConfigured {
-			_, source := loadConfig()
-			statusText = "✅ xAI API token is configured and ready to use"
-			if source == "environment" {
-				sourceInfo = "\n📍 Source: Environment variable (XAI_API_KEY)"
+			if strings.HasPrefix(source, "grok_oauth") {
+				statusText = "✅ Grok subscription OAuth is active — image tools use your SuperGrok / X Premium+ session"
 			} else {
-				sourceInfo = "\n📍 Source: Configuration file (~/.grok-image-config.json)"
+				statusText = "✅ xAI API credentials are configured and ready to use"
+			}
+			if desc := credentialSourceDescription(source); desc != "" {
+				sourceInfo = "\n📍 Source: " + desc
 			}
 		}
 		sendResponse(id, map[string]interface{}{
@@ -536,7 +541,7 @@ func handleToolCall(id interface{}, toolName string, arguments json.RawMessage) 
 			return
 		}
 		if !isMockMode() && apiKey == "" {
-			sendError(id, -32603, "xAI API token not configured. Use configure_xai_token first.", nil)
+			sendError(id, -32603, "xAI credentials not configured. Run `grok login` for subscription OAuth, or use configure_xai_token.", nil)
 			return
 		}
 		if isMockMode() {
@@ -550,7 +555,7 @@ func handleToolCall(id interface{}, toolName string, arguments json.RawMessage) 
 	switch toolName {
 	case "generate_image":
 		if !isMockMode() && apiKey == "" {
-			sendError(id, -32603, "xAI API token not configured. Use configure_xai_token first.", nil)
+			sendError(id, -32603, "xAI credentials not configured. Run `grok login` for subscription OAuth, or use configure_xai_token.", nil)
 			return
 		}
 		var args struct {
@@ -577,7 +582,7 @@ func handleToolCall(id interface{}, toolName string, arguments json.RawMessage) 
 
 	case "edit_image":
 		if !isMockMode() && apiKey == "" {
-			sendError(id, -32603, "xAI API token not configured. Use configure_xai_token first.", nil)
+			sendError(id, -32603, "xAI credentials not configured. Run `grok login` for subscription OAuth, or use configure_xai_token.", nil)
 			return
 		}
 		var args struct {
@@ -607,38 +612,6 @@ func handleToolCall(id interface{}, toolName string, arguments json.RawMessage) 
 	default:
 		sendError(id, -32601, fmt.Sprintf("Unknown tool: %s", toolName), nil)
 	}
-}
-
-func loadConfig() (string, string) {
-	if key := os.Getenv("XAI_API_KEY"); key != "" {
-		return key, "environment"
-	}
-
-	var config Config
-	// #nosec G304 - local config file read is intentional
-	if data, err := os.ReadFile(".grok-image-config.json"); err == nil {
-		if err := json.Unmarshal(data, &config); err == nil && config.XAIAPIKey != "" {
-			home, _ := os.UserHomeDir()
-			globalPath := filepath.Join(home, ".grok-image-config.json")
-			if _, err := os.Stat(globalPath); os.IsNotExist(err) {
-				// #nosec - global path is home-dir relative, migration is safe and intentional
-				_ = os.WriteFile(globalPath, data, 0600)
-				fmt.Fprintln(os.Stderr, "[grok-image-mcp] Automatically migrated local configuration to global:", globalPath)
-			}
-			return config.XAIAPIKey, "config_file"
-		}
-	}
-
-	home, _ := os.UserHomeDir()
-	globalPath := filepath.Join(home, ".grok-image-config.json")
-	// #nosec G304 - global config file read is intentional
-	if data, err := os.ReadFile(globalPath); err == nil {
-		if err := json.Unmarshal(data, &config); err == nil && config.XAIAPIKey != "" {
-			return config.XAIAPIKey, "config_file"
-		}
-	}
-
-	return "", "not_configured"
 }
 
 func saveConfig(key string) error {
@@ -1035,7 +1008,9 @@ Usage:
   grok-image-mcp --help       Show this help
 
 Environment:
-  XAI_API_KEY           xAI API key for live image generation
+  XAI_API_KEY           xAI API key for live image generation (pay-as-you-go)
+  GROK_IMAGE_AUTH       Credential priority: auto (default), oauth, api_key
+  GROK_AUTH_JSON        Path to Grok OAuth store (default: ~/.grok/auth.json)
   GROK_IMAGE_MOCK=1     Enable offline mock mode
   GROK_IMAGE_MODEL      Default model (grok-imagine-image-quality)
   GROK_IMAGES_DIR       Custom output directory for saved images
@@ -1053,7 +1028,7 @@ func runSetupWizard() {
 	fmt.Println()
 	fmt.Println("Choose a setup path:")
 	fmt.Println("  1) Mock mode only (free — no API key or credits)")
-	fmt.Println("  2) Live mode — configure xAI API key")
+	fmt.Println("  2) Live mode — Grok subscription OAuth or xAI API key")
 	fmt.Println("  3) Skip")
 	fmt.Println()
 
@@ -1092,7 +1067,18 @@ func runSetupWizard() {
 	}
 
 	fmt.Println()
-	fmt.Println("This wizard will help you configure your xAI API key for live mode.")
+	if token, src, err := loadGrokOAuthToken(context.Background()); err == nil && token != "" {
+		fmt.Println("✅ Detected Grok subscription OAuth in ~/.grok/auth.json")
+		if strings.HasPrefix(src, "grok_oauth (") {
+			fmt.Println("   Account:", strings.TrimSuffix(strings.TrimPrefix(src, "grok_oauth ("), ")"))
+		}
+		fmt.Println("   No API key needed — image tools will use your subscription session.")
+		fmt.Println("   Add this MCP server to your client and start generating.")
+		return
+	}
+
+	fmt.Println("No Grok OAuth session found. This wizard will configure an xAI API key for live mode.")
+	fmt.Println("Tip: SuperGrok / X Premium+ users can run `grok login` instead — no API key required.")
 	fmt.Println()
 
 	var apiKey string
