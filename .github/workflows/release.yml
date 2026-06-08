@@ -1,0 +1,48 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+
+      - name: Build binary
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o grok-image-mcp-linux-amd64 main.go
+          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-w -s" -o grok-image-mcp-darwin-arm64 main.go
+          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags="-w -s" -o grok-image-mcp-darwin-amd64 main.go
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-w -s" -o grok-image-mcp-windows-amd64.exe main.go
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [[ "${{ github.ref_name }}" == *-* ]]; then
+            PRERELEASE_FLAG="--prerelease"
+          else
+            PRERELEASE_FLAG=""
+          fi
+
+          gh release create "${{ github.ref_name }}" \
+            grok-image-mcp-linux-amd64 \
+            grok-image-mcp-darwin-arm64 \
+            grok-image-mcp-darwin-amd64 \
+            grok-image-mcp-windows-amd64.exe \
+            $PRERELEASE_FLAG \
+            --title "Release ${{ github.ref_name }}" \
+            --generate-notes
