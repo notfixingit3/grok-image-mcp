@@ -1,0 +1,11 @@
+# Hermes Agent — live mode via Grok subscription OAuth (no API key)
+# Add under mcp_servers in ~/.hermes/config.yaml
+# Prerequisite: run `grok login` once (stores ~/.grok/auth.json)
+
+grok-image-mcp:
+  command: /path/to/grok-image-mcp
+  timeout: 120
+  enabled: true
+
+# Tools appear as mcp_grok-image-mcp_* after restart.
+# Verify: hermes mcp list && hermes mcp test grok-image-mcp

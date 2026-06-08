@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "grok-image-mcp": {
+      "command": "/path/to/grok-image-mcp",
+      "env": {
+        "GROK_IMAGE_MODEL": "grok-imagine-image-quality"
+      }
+    }
+  }
+}

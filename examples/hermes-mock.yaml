@@ -1,0 +1,10 @@
+# Hermes Agent — mock mode (no API key or credits)
+# Add under mcp_servers in ~/.hermes/config.yaml
+
+grok-image-mcp:
+  command: /path/to/grok-image-mcp
+  env:
+    GROK_IMAGE_MOCK: "1"
+    GROK_IMAGE_MODEL: grok-imagine-image-quality
+  timeout: 120
+  enabled: true

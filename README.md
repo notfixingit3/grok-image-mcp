@@ -26,7 +26,7 @@
 
 # Grok Image MCP Server
 
-An MCP (Model Context Protocol) server that brings **Grok Imagine** image generation and editing to **Grok Build**, **Cursor**, **Claude Desktop**, **Claude Code**, **OpenCode**, **VS Code**, **Windsurf**, and any MCP-compatible client.
+An MCP (Model Context Protocol) server that brings **Grok Imagine** image generation and editing to **Grok Build**, **Cursor**, **Claude Desktop**, **Claude Code**, **OpenCode**, **Hermes Agent**, **VS Code**, **Windsurf**, and any MCP-compatible client.
 
 Adapted from [nano-banana-mcpv2](https://github.com/notfixingit3/nano-banana-mcpv2) (Gemini/Imagen) for xAI's image API.
 
@@ -107,9 +107,9 @@ go build -o grok-image-mcp .
 
 ### 2. Configure your MCP client
 
-See **[Client Integration](#client-integration)** below for Grok Build, Cursor, Claude, OpenCode, VS Code, Windsurf, and Docker.
+See **[Client Integration](#client-integration)** below for Grok Build, Cursor, Claude, OpenCode, Hermes, VS Code, Windsurf, and Docker.
 
-**Clone-and-go:** this repo ships with project-level mock configs — [`.grok/config.toml`](.grok/config.toml) (Grok Build), [`.mcp.json`](.mcp.json) (Claude Code), and [`.cursor/mcp.json`](.cursor/mcp.json) (Cursor). Open the repo in any of these clients and the tools load automatically (uses `go run .`, no pre-build needed).
+**Clone-and-go:** this repo ships with project-level configs — [`.grok/config.toml`](.grok/config.toml) (Grok Build), [`.mcp.json`](.mcp.json) (Claude Code), [`.cursor/mcp.json`](.cursor/mcp.json) (Cursor), and [`opencode.jsonc`](opencode.jsonc) (OpenCode, live OAuth via `go run .`). Open the repo in any of these clients and the tools load automatically (no pre-build needed).
 
 ### 3. Verify
 
@@ -131,7 +131,8 @@ Replace `/path/to/grok-image-mcp` with your built binary (`go build -o grok-imag
 | **Cursor** | `~/.cursor/mcp.json` or `.cursor/mcp.json` | [cursor-mcp.json](examples/cursor-mcp.json) |
 | **Claude Desktop** | `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) | [claude-desktop-mock.json](examples/claude-desktop-mock.json) |
 | **Claude Code** | `.mcp.json` in project root (or `~/.claude.json`) | [claude-code-mock.json](examples/claude-code-mock.json) |
-| **OpenCode** | `opencode.jsonc` in project root (or `~/.config/opencode/opencode.jsonc`) | [opencode-mock.jsonc](examples/opencode-mock.jsonc) |
+| **OpenCode** | `opencode.jsonc` in project root (or `~/.config/opencode/opencode.json`) | [opencode-oauth-live.jsonc](examples/opencode-oauth-live.jsonc) |
+| **Hermes Agent** | `~/.hermes/config.yaml` under `mcp_servers` | [hermes-oauth-live.yaml](examples/hermes-oauth-live.yaml) |
 | **VS Code** (Copilot MCP) | `~/Library/Application Support/Code/User/mcp.json` (macOS) | [vscode-mcp.json](examples/vscode-mcp.json) |
 | **Windsurf** | `~/.codeium/windsurf/mcp_config.json` | [windsurf-mcp.json](examples/windsurf-mcp.json) |
 | **Docker** | any client's `mcpServers` block | see [Installation Options](#installation-options) |
@@ -213,7 +214,7 @@ Restart Cursor or reload MCP servers from settings. Example: [cursor-mcp.json](e
 }
 ```
 
-Restart Claude Desktop after saving. Example: [claude-desktop-mock.json](examples/claude-desktop-mock.json)
+Restart Claude Desktop after saving. Examples: [claude-desktop-oauth-live.json](examples/claude-desktop-oauth-live.json) · mock: [claude-desktop-mock.json](examples/claude-desktop-mock.json)
 
 ---
 
@@ -260,7 +261,31 @@ Add to `opencode.jsonc` (project root or `~/.config/opencode/opencode.jsonc`):
 }
 ```
 
-OpenCode uses `environment` (not `env`) and `command` as an array. Verify with `opencode mcp list`. Examples: [opencode-mock.jsonc](examples/opencode-mock.jsonc) · [opencode-live.jsonc](examples/opencode-live.jsonc)
+OpenCode uses `environment` (not `env`) and `command` as an array. Verify with `opencode mcp list`. This repo includes [`opencode.jsonc`](opencode.jsonc) (live OAuth, no API key). Examples: [opencode-oauth-live.jsonc](examples/opencode-oauth-live.jsonc) · [opencode-mock.jsonc](examples/opencode-mock.jsonc)
+
+---
+
+### Hermes Agent
+
+Add under `mcp_servers` in `~/.hermes/config.yaml`:
+
+```yaml
+mcp_servers:
+  grok-image-mcp:
+    command: /path/to/grok-image-mcp
+    timeout: 120
+    enabled: true
+```
+
+SuperGrok / X Premium+ users: run `grok login` once — no `XAI_API_KEY` needed. Tools register as `mcp_grok-image-mcp_*` on startup.
+
+```bash
+hermes mcp list
+hermes mcp test grok-image-mcp
+/reload-mcp    # in an active Hermes session
+```
+
+Examples: [hermes-oauth-live.yaml](examples/hermes-oauth-live.yaml) · mock: [hermes-mock.yaml](examples/hermes-mock.yaml)
 
 ---
 

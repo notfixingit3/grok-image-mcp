@@ -1,0 +1,13 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "grok-image-mcp": {
+      "type": "local",
+      "command": ["go", "run", "."],
+      "environment": {
+        "GROK_IMAGE_MODEL": "grok-imagine-image-quality"
+      },
+      "enabled": true
+    }
+  }
+}
