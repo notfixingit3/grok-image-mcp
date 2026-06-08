@@ -61,6 +61,7 @@ The server checks configuration in the following priority:
 2. **Environment Variables**:
    - `XAI_API_KEY`: Your xAI API key from [console.x.ai](https://console.x.ai).
    - `GROK_IMAGE_MODEL`: Set a default model server-wide (e.g., `grok-imagine-image-quality`).
+   - `GROK_IMAGES_DIR`: Custom directory for saved images (overrides platform defaults).
    - `GROK_IMAGE_LOG_FILE`: Optional path for request/response logging.
 3. **Global Configuration**: `~/.grok-image-config.json` generated via the `configure_xai_token` tool.
 
@@ -88,7 +89,7 @@ Image generation and editing require an xAI team with active credits or licenses
 ### Method A: Build & Run Locally (Recommended for Development)
 
 ```bash
-go build -o grok-image-mcp main.go
+go build -o grok-image-mcp .
 ```
 
 Protocol tests (no API credits needed):
@@ -110,7 +111,7 @@ Add this to your MCP settings file (e.g., Cursor, Claude Desktop, or Claude Code
 {
   "mcpServers": {
     "grok-image-mcp": {
-      "command": "/Users/house/Documents/gitlab/grok-image-mcp/grok-image-mcp",
+      "command": "/path/to/grok-image-mcp",
       "env": {
         "XAI_API_KEY": "your-xai-api-key-here",
         "GROK_IMAGE_MODEL": "grok-imagine-image-quality"
@@ -123,7 +124,7 @@ Add this to your MCP settings file (e.g., Cursor, Claude Desktop, or Claude Code
 ### Method B: Interactive Setup Wizard
 
 ```bash
-go build -o grok-image-mcp main.go
+go build -o grok-image-mcp .
 ./grok-image-mcp --setup
 ```
 
@@ -166,6 +167,7 @@ Create a new image from a text description using Grok Imagine.
 - **`aspectRatio`** (optional): `1:1`, `16:9`, `9:16`, `4:3`, `3:4`, `3:2`, `2:3`, `2:1`, `1:2`, `19.5:9`, `9:19.5`, `20:9`, `9:20`, or `auto`.
 - **`resolution`** (optional): `1k` or `2k`.
 - **`numberOfImages`** (optional): Number of images to generate (1-10).
+- **`serviceTier`** (optional): `default` or `priority` for faster processing.
 
 ### `edit_image`
 Modify a specific existing image file.
@@ -175,6 +177,8 @@ Modify a specific existing image file.
 - **`model`** (optional): Custom model name.
 - **`aspectRatio`** (optional): Output aspect ratio.
 - **`resolution`** (optional): `1k` or `2k`.
+- **`numberOfImages`** (optional): Number of edited variations (1-10).
+- **`serviceTier`** (optional): `default` or `priority`.
 
 ### `continue_editing`
 Refine the last image generated/edited in the active session.
@@ -183,6 +187,8 @@ Refine the last image generated/edited in the active session.
 - **`model`** (optional): Custom model name.
 - **`aspectRatio`** (optional): Output aspect ratio.
 - **`resolution`** (optional): `1k` or `2k`.
+- **`numberOfImages`** (optional): Number of edited variations (1-10).
+- **`serviceTier`** (optional): `default` or `priority`.
 
 ### `get_last_image_info`
 Check details of the last generated/edited image (file path, file size, last modified timestamp).

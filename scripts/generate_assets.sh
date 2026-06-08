@@ -13,7 +13,7 @@ fi
 
 mkdir -p assets generated_imgs
 
-go build -o grok-image-mcp main.go
+go build -o grok-image-mcp .
 
 call_tool() {
   local name="$1"

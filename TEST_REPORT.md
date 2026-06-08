@@ -2,7 +2,7 @@
 
 This report documents the local integration and visual verification tests performed for the initial `grok-image-mcp` release.
 
-## Version: `v0.1.0` (dev)
+## Version: `v0.1.1` (dev)
 - **Build Date**: 2026-06-08
 - **Platform**: macOS arm64 (`darwin/arm64`)
 - **Go Version**: `go1.22+`
@@ -38,13 +38,28 @@ Run with:
 
 **Result: PASSED**
 
+Run with:
+
+```bash
+go test -v ./...
+./scripts/test_protocol.sh
+```
+
 Verified:
-- MCP `initialize` returns `grok-image-mcp` v0.1.0
+- MCP `initialize` returns `grok-image-mcp` v0.1.1
 - `tools/list` exposes all 6 expected tools
 - `get_configuration_status` works with and without `XAI_API_KEY`
 - `get_last_image_info` works without an API key in an empty session
 - `continue_editing` returns a clear guard error when no prior image exists
 - Legacy Gemini tool `generate_imagen` is correctly rejected as unknown
+- `edit_image` rejects unsupported formats and files over 20 MiB before calling xAI
+- `GROK_IMAGES_DIR` is accepted by the server
+
+## Unit Tests
+
+**Result: PASSED** (11 tests)
+
+Covers error formatting, model resolution, image validation, reference image warnings, API key validation (mocked), and 429 retry behavior.
 
 ---
 
@@ -102,4 +117,6 @@ The server now surfaces this with a clearer message pointing to https://console.
 | Documentation updated | ✅ Complete |
 | Grok-generated logo & sample assets | ✅ Complete |
 | MCP protocol / stdio tests | ✅ Passed |
+| Go unit tests | ✅ Passed |
+| CI workflow (test + gosec) | ✅ Added |
 | Live xAI image generation/editing | ⏳ Blocked (no API credits) |

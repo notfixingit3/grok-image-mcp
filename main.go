@@ -8,12 +8,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"math/rand"
 	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -21,7 +19,7 @@ import (
 
 const (
 	ServerName    = "grok-image-mcp"
-	ServerVersion = "0.1.0"
+	ServerVersion = "0.1.1"
 	XAIBaseURL    = "https://api.x.ai/v1"
 )
 
@@ -74,8 +72,6 @@ func main() {
 		runSetupWizard()
 		return
 	}
-
-	rand.Seed(time.Now().UnixNano())
 
 	logPath := os.Getenv("GROK_IMAGE_LOG_FILE")
 	if logPath != "" {
@@ -262,6 +258,11 @@ func getToolsList() []Tool {
 						"minimum":     1,
 						"maximum":     10,
 					},
+					"serviceTier": map[string]interface{}{
+						"type":        "string",
+						"description": "Optional service tier. Use 'priority' for faster processing.",
+						"enum":        []string{"default", "priority"},
+					},
 				},
 				Required: []string{"prompt"},
 			},
@@ -302,6 +303,17 @@ func getToolsList() []Tool {
 						"description": "Optional output resolution. Defaults to '1k'.",
 						"enum":        []string{"1k", "2k"},
 					},
+					"numberOfImages": map[string]interface{}{
+						"type":        "integer",
+						"description": "Optional number of edited variations to generate (1-10). Defaults to 1.",
+						"minimum":     1,
+						"maximum":     10,
+					},
+					"serviceTier": map[string]interface{}{
+						"type":        "string",
+						"description": "Optional service tier. Use 'priority' for faster processing.",
+						"enum":        []string{"default", "priority"},
+					},
 				},
 				Required: []string{"imagePath", "prompt"},
 			},
@@ -337,6 +349,17 @@ func getToolsList() []Tool {
 						"type":        "string",
 						"description": "Optional output resolution. Defaults to '1k'.",
 						"enum":        []string{"1k", "2k"},
+					},
+					"numberOfImages": map[string]interface{}{
+						"type":        "integer",
+						"description": "Optional number of edited variations to generate (1-10). Defaults to 1.",
+						"minimum":     1,
+						"maximum":     10,
+					},
+					"serviceTier": map[string]interface{}{
+						"type":        "string",
+						"description": "Optional service tier. Use 'priority' for faster processing.",
+						"enum":        []string{"default", "priority"},
 					},
 				},
 				Required: []string{"prompt"},
@@ -376,6 +399,15 @@ func handleToolCall(id interface{}, toolName string, arguments json.RawMessage) 
 		}
 		if args.APIKey == "" {
 			sendError(id, -32602, "API key is required", nil)
+			return
+		}
+		ctx := globalCtx
+		if ctx == nil {
+			ctx = context.Background()
+		}
+		statusCode, bodyBytes, err := validateAPIKey(ctx, args.APIKey)
+		if err != nil {
+			sendError(id, -32603, formatValidationFailure(statusCode, bodyBytes), string(bodyBytes))
 			return
 		}
 		if err := saveConfig(args.APIKey); err != nil {
@@ -459,6 +491,8 @@ func handleToolCall(id interface{}, toolName string, arguments json.RawMessage) 
 			Model           *string  `json:"model"`
 			AspectRatio     *string  `json:"aspectRatio"`
 			Resolution      *string  `json:"resolution"`
+			NumberOfImages  *int     `json:"numberOfImages"`
+			ServiceTier     *string  `json:"serviceTier"`
 		}
 		if err := json.Unmarshal(arguments, &args); err != nil {
 			sendError(id, -32602, "Invalid arguments", err.Error())
@@ -476,7 +510,7 @@ func handleToolCall(id interface{}, toolName string, arguments json.RawMessage) 
 			sendError(id, -32603, "xAI API token not configured. Use configure_xai_token first.", nil)
 			return
 		}
-		handleEditImage(id, apiKey, lastImagePath, args.Prompt, args.ReferenceImages, args.Model, args.AspectRatio, args.Resolution)
+		handleEditImage(id, apiKey, lastImagePath, args.Prompt, args.ReferenceImages, args.Model, args.AspectRatio, args.Resolution, args.NumberOfImages, args.ServiceTier)
 		return
 	}
 
@@ -492,12 +526,13 @@ func handleToolCall(id interface{}, toolName string, arguments json.RawMessage) 
 			AspectRatio    *string `json:"aspectRatio"`
 			Resolution     *string `json:"resolution"`
 			NumberOfImages *int    `json:"numberOfImages"`
+			ServiceTier    *string `json:"serviceTier"`
 		}
 		if err := json.Unmarshal(arguments, &args); err != nil {
 			sendError(id, -32602, "Invalid arguments", err.Error())
 			return
 		}
-		handleGenerateImage(id, apiKey, args.Prompt, args.Model, args.AspectRatio, args.Resolution, args.NumberOfImages)
+		handleGenerateImage(id, apiKey, args.Prompt, args.Model, args.AspectRatio, args.Resolution, args.NumberOfImages, args.ServiceTier)
 
 	case "edit_image":
 		if apiKey == "" {
@@ -511,12 +546,14 @@ func handleToolCall(id interface{}, toolName string, arguments json.RawMessage) 
 			Model           *string  `json:"model"`
 			AspectRatio     *string  `json:"aspectRatio"`
 			Resolution      *string  `json:"resolution"`
+			NumberOfImages  *int     `json:"numberOfImages"`
+			ServiceTier     *string  `json:"serviceTier"`
 		}
 		if err := json.Unmarshal(arguments, &args); err != nil {
 			sendError(id, -32602, "Invalid arguments", err.Error())
 			return
 		}
-		handleEditImage(id, apiKey, args.ImagePath, args.Prompt, args.ReferenceImages, args.Model, args.AspectRatio, args.Resolution)
+		handleEditImage(id, apiKey, args.ImagePath, args.Prompt, args.ReferenceImages, args.Model, args.AspectRatio, args.Resolution, args.NumberOfImages, args.ServiceTier)
 
 	default:
 		sendError(id, -32601, fmt.Sprintf("Unknown tool: %s", toolName), nil)
@@ -570,63 +607,13 @@ func saveConfig(key string) error {
 	return os.WriteFile(globalPath, data, 0600)
 }
 
-func resolveModel(customModel *string) string {
-	if customModel != nil && strings.TrimSpace(*customModel) != "" {
-		return strings.TrimSpace(*customModel)
-	}
-	if envModel := os.Getenv("GROK_IMAGE_MODEL"); envModel != "" {
-		return strings.TrimSpace(envModel)
-	}
-	return "grok-imagine-image-quality"
-}
-
-func getImagesDirectory() string {
-	home, _ := os.UserHomeDir()
-	if runtime.GOOS == "windows" {
-		return filepath.Join(home, "Documents", "grok-images")
-	}
-
-	cwd, err := os.Getwd()
-	if err != nil {
-		cwd = "."
-	}
-	if strings.HasPrefix(cwd, "/usr/") || strings.HasPrefix(cwd, "/opt/") || strings.HasPrefix(cwd, "/var/") {
-		return filepath.Join(home, "grok-images")
-	}
-	return filepath.Join(cwd, "generated_imgs")
-}
-
-func getMimeType(filePath string) string {
-	ext := strings.ToLower(filepath.Ext(filePath))
-	switch ext {
-	case ".jpg", ".jpeg":
-		return "image/jpeg"
-	case ".png":
-		return "image/png"
-	case ".webp":
-		return "image/webp"
-	default:
-		return "image/jpeg"
-	}
-}
-
-func extensionForMimeType(mimeType string) string {
-	switch mimeType {
-	case "image/png":
-		return ".png"
-	case "image/webp":
-		return ".webp"
-	default:
-		return ".jpg"
-	}
-}
-
 type GenerateRequest struct {
 	Model          string  `json:"model"`
 	Prompt         string  `json:"prompt"`
 	AspectRatio    *string `json:"aspect_ratio,omitempty"`
 	N              *int    `json:"n,omitempty"`
 	Resolution     *string `json:"resolution,omitempty"`
+	ServiceTier    *string `json:"service_tier,omitempty"`
 	ResponseFormat string  `json:"response_format"`
 }
 
@@ -641,7 +628,9 @@ type EditRequest struct {
 	Image          *ImageRef  `json:"image,omitempty"`
 	Images         []ImageRef `json:"images,omitempty"`
 	AspectRatio    *string    `json:"aspect_ratio,omitempty"`
+	N              *int       `json:"n,omitempty"`
 	Resolution     *string    `json:"resolution,omitempty"`
+	ServiceTier    *string    `json:"service_tier,omitempty"`
 	ResponseFormat string     `json:"response_format"`
 }
 
@@ -655,42 +644,44 @@ type ImageResponse struct {
 	Data []ImageData `json:"data"`
 }
 
-func formatXAIError(statusCode int, bodyBytes []byte) string {
-	message := fmt.Sprintf("xAI API call failed with status %d", statusCode)
-	var errResp struct {
-		Code  string `json:"code"`
-		Error string `json:"error"`
-	}
-	if err := json.Unmarshal(bodyBytes, &errResp); err == nil {
-		if errResp.Error != "" {
-			message = errResp.Error
-		} else if errResp.Code != "" {
-			message = errResp.Code
+func doXAIRequest(ctx context.Context, apiKey, endpoint string, payload interface{}) (*ImageResponse, int, []byte, error) {
+	retryDelays := []time.Duration{0, 2 * time.Second, 4 * time.Second}
+	var lastStatus int
+	var lastBody []byte
+	var lastErr error
+
+	for attempt, delay := range retryDelays {
+		if delay > 0 {
+			logMessage("Retrying xAI request after %v (attempt %d)", delay, attempt+1)
+			select {
+			case <-ctx.Done():
+				return nil, 0, nil, ctx.Err()
+			case <-time.After(delay):
+			}
+		}
+
+		imageResp, statusCode, bodyBytes, err := doXAIRequestOnce(ctx, apiKey, endpoint, payload)
+		if err == nil {
+			return imageResp, statusCode, bodyBytes, nil
+		}
+		lastStatus = statusCode
+		lastBody = bodyBytes
+		lastErr = err
+		if statusCode != http.StatusTooManyRequests {
+			return nil, statusCode, bodyBytes, err
 		}
 	}
-	if statusCode == http.StatusForbidden && strings.Contains(strings.ToLower(message), "credit") {
-		message += " Add credits or licenses at https://console.x.ai before using image generation."
-	}
-	return message
+
+	return nil, lastStatus, lastBody, lastErr
 }
 
-func encodeImageAsDataURI(imagePath string) (string, error) {
-	// #nosec G304 - reading image path is intentional and requested by user/client
-	imgData, err := os.ReadFile(imagePath)
-	if err != nil {
-		return "", err
-	}
-	mimeType := getMimeType(imagePath)
-	return fmt.Sprintf("data:%s;base64,%s", mimeType, base64.StdEncoding.EncodeToString(imgData)), nil
-}
-
-func doXAIRequest(ctx context.Context, apiKey, endpoint string, payload interface{}) (*ImageResponse, int, []byte, error) {
+func doXAIRequestOnce(ctx context.Context, apiKey, endpoint string, payload interface{}) (*ImageResponse, int, []byte, error) {
 	payloadData, err := json.Marshal(payload)
 	if err != nil {
 		return nil, 0, nil, fmt.Errorf("payload formatting error: %w", err)
 	}
 
-	url := XAIBaseURL + endpoint
+	url := xaiBaseURL + endpoint
 	logMessage("Sending request to URL: %s", url)
 
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(payloadData))
@@ -787,8 +778,7 @@ func saveImageResult(ctx context.Context, imageData ImageData, prefix string) (s
 	_ = os.MkdirAll(imagesDir, 0755)
 
 	timestamp := time.Now().Format("20060102-150405")
-	// #nosec G404 - weak random is sufficient for filename random identifier
-	randomID := fmt.Sprintf("%06d", rand.Intn(1000000))
+	randomID := randomSuffix()
 	ext := extensionForMimeType(mimeType)
 	fileName := fmt.Sprintf("%s-%s-%s%s", prefix, timestamp, randomID, ext)
 	filePath := filepath.Join(imagesDir, fileName)
@@ -802,7 +792,7 @@ func saveImageResult(ctx context.Context, imageData ImageData, prefix string) (s
 	return filePath, b64, nil
 }
 
-func handleGenerateImage(id interface{}, apiKey, prompt string, customModel, aspectRatio, resolution *string, numberOfImages *int) {
+func handleGenerateImage(id interface{}, apiKey, prompt string, customModel, aspectRatio, resolution *string, numberOfImages *int, serviceTier *string) {
 	model := resolveModel(customModel)
 
 	reqPayload := GenerateRequest{
@@ -811,6 +801,7 @@ func handleGenerateImage(id interface{}, apiKey, prompt string, customModel, asp
 		AspectRatio:    aspectRatio,
 		N:              numberOfImages,
 		Resolution:     resolution,
+		ServiceTier:    serviceTier,
 		ResponseFormat: "b64_json",
 	}
 
@@ -863,6 +854,9 @@ func handleGenerateImage(id interface{}, apiKey, prompt string, customModel, asp
 	if numberOfImages != nil && *numberOfImages > 1 {
 		statusText += fmt.Sprintf("\nImages Requested: %d", *numberOfImages)
 	}
+	if serviceTier != nil && *serviceTier != "" {
+		statusText += fmt.Sprintf("\nService Tier: %s", *serviceTier)
+	}
 
 	if len(savedFiles) > 0 {
 		statusText += "\n\n📁 Image saved to:\n"
@@ -885,12 +879,12 @@ func handleGenerateImage(id interface{}, apiKey, prompt string, customModel, asp
 	})
 }
 
-func handleEditImage(id interface{}, apiKey, imagePath, prompt string, referenceImages []string, customModel, aspectRatio, resolution *string) {
+func handleEditImage(id interface{}, apiKey, imagePath, prompt string, referenceImages []string, customModel, aspectRatio, resolution *string, numberOfImages *int, serviceTier *string) {
 	model := resolveModel(customModel)
 
-	mainDataURI, err := encodeImageAsDataURI(imagePath)
+	allImages, warning, err := buildEditImageRefs(imagePath, referenceImages)
 	if err != nil {
-		sendError(id, -32603, fmt.Sprintf("Failed to read image at %s", imagePath), err.Error())
+		sendError(id, -32603, fmt.Sprintf("Failed to prepare images for editing: %s", imagePath), err.Error())
 		return
 	}
 
@@ -898,18 +892,10 @@ func handleEditImage(id interface{}, apiKey, imagePath, prompt string, reference
 		Model:          model,
 		Prompt:         prompt,
 		AspectRatio:    aspectRatio,
+		N:              numberOfImages,
 		Resolution:     resolution,
+		ServiceTier:    serviceTier,
 		ResponseFormat: "b64_json",
-	}
-
-	allImages := []ImageRef{{URL: mainDataURI, Type: "image_url"}}
-	for _, refPath := range referenceImages {
-		if len(allImages) >= 3 {
-			break
-		}
-		if refDataURI, err := encodeImageAsDataURI(refPath); err == nil {
-			allImages = append(allImages, ImageRef{URL: refDataURI, Type: "image_url"})
-		}
 	}
 
 	if len(allImages) == 1 {
@@ -958,8 +944,14 @@ func handleEditImage(id interface{}, apiKey, imagePath, prompt string, reference
 	}
 
 	statusText := fmt.Sprintf("🎨 Image edited with Grok Imagine (%s)!\n\nOriginal: %s\nEdit prompt: \"%s\"", model, imagePath, prompt)
+	if warning != "" {
+		statusText += fmt.Sprintf("\n\n⚠️ %s", warning)
+	}
 	if len(referenceImages) > 0 {
-		statusText += fmt.Sprintf("\nReference images: %d", len(referenceImages))
+		statusText += fmt.Sprintf("\nReference images provided: %d", len(referenceImages))
+	}
+	if numberOfImages != nil && *numberOfImages > 1 {
+		statusText += fmt.Sprintf("\nVariations requested: %d", *numberOfImages)
 	}
 
 	if len(savedFiles) > 0 {
@@ -1008,33 +1000,9 @@ func runSetupWizard() {
 
 	fmt.Println("\n🔍 Validating your API key against xAI API...")
 
-	req, err := http.NewRequest("GET", XAIBaseURL+"/models", nil)
+	statusCode, bodyBytes, err := validateAPIKey(context.Background(), apiKey)
 	if err != nil {
-		fmt.Printf("❌ Request creation error: %v\n", err)
-		os.Exit(1)
-	}
-	req.Header.Set("Authorization", "Bearer "+apiKey)
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		fmt.Printf("❌ Connection error while validating key: %v\n", err)
-		os.Exit(1)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		var errResp struct {
-			Error struct {
-				Message string `json:"message"`
-			} `json:"error"`
-		}
-		_ = json.Unmarshal(bodyBytes, &errResp)
-		if errResp.Error.Message != "" {
-			fmt.Printf("❌ API key validation failed (Status %d): %s\n", resp.StatusCode, errResp.Error.Message)
-		} else {
-			fmt.Printf("❌ API key validation failed with HTTP status %d\n", resp.StatusCode)
-		}
+		fmt.Printf("❌ %s\n", formatValidationFailure(statusCode, bodyBytes))
 		os.Exit(1)
 	}
 

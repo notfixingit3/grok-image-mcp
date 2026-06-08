@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-06-08
+
+### Added
+- `GROK_IMAGES_DIR` environment variable for custom image output directory.
+- `serviceTier` parameter on `generate_image`, `edit_image`, and `continue_editing`.
+- `numberOfImages` parameter on `edit_image` and `continue_editing`.
+- Automatic retry with backoff on xAI HTTP 429 rate limits.
+- Image file validation before upload (20 MiB max, JPEG/PNG/WebP only).
+- Warnings when reference images are skipped or fail to load.
+- API key validation in `configure_xai_token` (matches `--setup` behavior).
+- Go unit tests (`main_test.go`) and CI workflow (tests, protocol tests, gosec).
+- Expanded protocol tests for format/size validation.
+
+### Changed
+- Build all scripts and Docker/release workflows with `go build .` (multi-file package).
+- Replaced deprecated `math/rand` seeding with `crypto/rand` filename suffixes.
+- Generic README MCP config path (`/path/to/grok-image-mcp`).
+
 ## [0.1.0] - 2026-06-08
 
 ### Changed

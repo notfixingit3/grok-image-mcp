@@ -10,7 +10,7 @@ if [ -z "$XAI_API_KEY" ]; then
 fi
 
 echo "🚀 Compiling server binary..."
-go build -o grok-image-mcp main.go
+go build -o grok-image-mcp .
 
 echo "🎨 Sending generate_image tool request over stdio..."
 REQUEST='{"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "generate_image", "arguments": {"prompt": "A simple abstract logo with flowing curves, minimal vector style", "model": "grok-imagine-image", "aspectRatio": "1:1"}}, "id": 1}'
