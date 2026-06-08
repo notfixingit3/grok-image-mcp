@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "grok-image-mcp": {
+      "command": "go",
+      "args": ["run", "."],
+      "env": {
+        "GROK_IMAGE_MOCK": "1",
+        "GROK_IMAGE_MODEL": "grok-imagine-image-quality"
+      }
+    }
+  }
+}

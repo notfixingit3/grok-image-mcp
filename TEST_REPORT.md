@@ -2,7 +2,7 @@
 
 This report documents the local integration and visual verification tests performed for the initial `grok-image-mcp` release.
 
-## Version: `v0.1.2` (dev)
+## Version: `v0.2.0-beta.0` (dev)
 - **Build Date**: 2026-06-08
 - **Platform**: macOS arm64 (`darwin/arm64`)
 - **Go Version**: `go1.22+`
@@ -46,7 +46,7 @@ go test -v ./...
 ```
 
 Verified:
-- MCP `initialize` returns `grok-image-mcp` v0.1.2
+- MCP `initialize` returns `grok-image-mcp` v0.2.0-beta.0
 - `tools/list` exposes all 6 expected tools
 - `get_configuration_status` works with and without `XAI_API_KEY`
 - `get_last_image_info` works without an API key in an empty session
@@ -54,12 +54,15 @@ Verified:
 - Legacy Gemini tool `generate_imagen` is correctly rejected as unknown
 - `edit_image` rejects unsupported formats and files over 20 MiB before calling xAI
 - `GROK_IMAGES_DIR` is accepted by the server
+- Mock mode works without `XAI_API_KEY` (`get_configuration_status`, `generate_image`, `configure_xai_token`)
+- Empty prompts and invalid `aspectRatio` values are rejected before API calls
+- `--version` reports `0.2.0-beta.0`
 
 ## Unit Tests
 
-**Result: PASSED** (11 tests)
+**Result: PASSED** (13 tests)
 
-Covers error formatting, model resolution, image validation, reference image warnings, API key validation (mocked), and 429 retry behavior.
+Covers error formatting, model resolution, image validation, reference image warnings, API key validation (mocked), 429 retry behavior, and tool argument validation.
 
 ---
 

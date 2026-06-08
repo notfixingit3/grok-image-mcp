@@ -73,5 +73,40 @@ echo "✅ GROK_IMAGES_DIR env accepted"
 
 unset XAI_API_KEY || true
 
+echo "🔧 --version flag"
+VERSION=$(./grok-image-mcp --version)
+echo "$VERSION" | grep -q '0\.2\.0-beta' || { echo "❌ unexpected version: $VERSION"; exit 1; }
+echo "✅ --version ($VERSION)"
+
+echo "🔧 empty prompt rejected"
+export GROK_IMAGE_MOCK=1
+RESP=$(call_rpc '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"generate_image","arguments":{"prompt":"   "}},"id":9}')
+echo "$RESP" | grep -q 'prompt is required' || exit 1
+echo "✅ empty prompt validation"
+
+echo "🔧 invalid aspectRatio rejected"
+RESP=$(call_rpc '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"generate_image","arguments":{"prompt":"test","aspectRatio":"99:99"}},"id":10}')
+echo "$RESP" | grep -q 'invalid aspectRatio' || exit 1
+echo "✅ aspectRatio validation"
+
+echo "🔧 mock mode: get_configuration_status without API key"
+unset XAI_API_KEY || true
+RESP=$(call_rpc '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_configuration_status","arguments":{}},"id":11}')
+echo "$RESP" | grep -q 'Mock mode is active' || exit 1
+echo "✅ mock configuration status"
+
+echo "🔧 mock mode: generate_image without API key"
+RESP=$(call_rpc '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"generate_image","arguments":{"prompt":"protocol mock test"}},"id":12}')
+echo "$RESP" | grep -q '\[MOCK\]' || exit 1
+echo "✅ mock generate_image without key"
+
+echo "🔧 mock mode: configure_xai_token skips live validation"
+RESP=$(call_rpc '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"configure_xai_token","arguments":{"apiKey":"xai-mock-test-key"}},"id":13}')
+echo "$RESP" | grep -q 'configured successfully' || exit 1
+echo "✅ mock configure_xai_token"
+
+unset GROK_IMAGE_MOCK || true
+unset XAI_API_KEY || true
+
 echo ""
 echo "🎉 Protocol tests passed."

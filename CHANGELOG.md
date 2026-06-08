@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0-beta.0] - 2026-06-08
+
+### Added
+- **Client Integration** docs for Grok Build, Cursor, Claude Desktop, Claude Code, OpenCode, VS Code, and Windsurf.
+- Per-client example configs in `examples/` (TOML, JSON, JSONC).
+- Project-level auto-config: `.grok/config.toml`, `.mcp.json`, `.cursor/mcp.json` (mock mode via `go run .`).
+- CLI `--version` and `--help` flags.
+- Input validation for tool arguments (empty prompts, invalid enums, `numberOfImages` range).
+- Mock-mode protocol tests in `scripts/test_protocol.sh`.
+
+### Changed
+- Setup wizard (`--setup`) now offers mock-only, live key, or skip paths.
+- Docker docs include mock-mode example alongside live config.
+
 ## [0.1.2] - 2026-06-08
 
 ### Added

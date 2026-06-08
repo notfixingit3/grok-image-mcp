@@ -19,7 +19,7 @@ import (
 
 const (
 	ServerName    = "grok-image-mcp"
-	ServerVersion = "0.1.2"
+	ServerVersion = "0.2.0-beta.0"
 	XAIBaseURL    = "https://api.x.ai/v1"
 )
 
@@ -69,13 +69,21 @@ var (
 )
 
 func main() {
-	if len(os.Args) > 1 && (os.Args[1] == "--setup" || os.Args[1] == "-setup") {
-		runSetupWizard()
-		return
-	}
-	if len(os.Args) > 1 && (os.Args[1] == "--mock" || os.Args[1] == "-mock") {
-		mockModeEnabled = true
-		os.Args = append(os.Args[:1], os.Args[2:]...)
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "--setup", "-setup":
+			runSetupWizard()
+			return
+		case "--version", "-version", "-v":
+			fmt.Println(ServerVersion)
+			return
+		case "--help", "-help", "-h":
+			printHelp()
+			return
+		case "--mock", "-mock":
+			mockModeEnabled = true
+			os.Args = append(os.Args[:1], os.Args[2:]...)
+		}
 	}
 
 	if isMockMode() {
@@ -515,6 +523,10 @@ func handleToolCall(id interface{}, toolName string, arguments json.RawMessage) 
 			sendError(id, -32602, "Invalid arguments", err.Error())
 			return
 		}
+		if err := validateGenerateImageArgs(args.Prompt, args.Model, args.AspectRatio, args.Resolution, args.ServiceTier, args.NumberOfImages); err != nil {
+			sendError(id, -32602, err.Error(), nil)
+			return
+		}
 		if lastImagePath == "" {
 			sendError(id, -32603, "No previous image found. Please generate or edit an image first.", nil)
 			return
@@ -553,6 +565,10 @@ func handleToolCall(id interface{}, toolName string, arguments json.RawMessage) 
 			sendError(id, -32602, "Invalid arguments", err.Error())
 			return
 		}
+		if err := validateGenerateImageArgs(args.Prompt, args.Model, args.AspectRatio, args.Resolution, args.ServiceTier, args.NumberOfImages); err != nil {
+			sendError(id, -32602, err.Error(), nil)
+			return
+		}
 		if isMockMode() {
 			handleMockGenerateImage(id, args.Prompt, args.Model, args.AspectRatio, args.Resolution, args.NumberOfImages, args.ServiceTier)
 		} else {
@@ -576,6 +592,10 @@ func handleToolCall(id interface{}, toolName string, arguments json.RawMessage) 
 		}
 		if err := json.Unmarshal(arguments, &args); err != nil {
 			sendError(id, -32602, "Invalid arguments", err.Error())
+			return
+		}
+		if err := validateEditImageArgs(args.ImagePath, args.Prompt, args.Model, args.AspectRatio, args.Resolution, args.ServiceTier, args.NumberOfImages); err != nil {
+			sendError(id, -32602, err.Error(), nil)
 			return
 		}
 		if isMockMode() {
@@ -1004,11 +1024,75 @@ func handleEditImage(id interface{}, apiKey, imagePath, prompt string, reference
 	})
 }
 
+func printHelp() {
+	fmt.Printf(`Grok Image MCP Server v%s
+
+Usage:
+  grok-image-mcp              Start MCP server (stdio JSON-RPC)
+  grok-image-mcp --mock       Start in mock mode (no xAI credits)
+  grok-image-mcp --setup      Interactive setup wizard
+  grok-image-mcp --version    Print version
+  grok-image-mcp --help       Show this help
+
+Environment:
+  XAI_API_KEY           xAI API key for live image generation
+  GROK_IMAGE_MOCK=1     Enable offline mock mode
+  GROK_IMAGE_MODEL      Default model (grok-imagine-image-quality)
+  GROK_IMAGES_DIR       Custom output directory for saved images
+  GROK_IMAGE_MOCK_ASSET Image file used as mock output
+  GROK_IMAGE_LOG_FILE   Optional request/response log path
+
+Docs: https://github.com/notfixingit3/grok-image-mcp
+`, ServerVersion)
+}
+
 func runSetupWizard() {
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Println("🖼️  Grok Image MCP - Interactive Setup Wizard")
 	fmt.Println("==============================================")
-	fmt.Println("This wizard will help you configure your xAI API key.")
+	fmt.Println()
+	fmt.Println("Choose a setup path:")
+	fmt.Println("  1) Mock mode only (free — no API key or credits)")
+	fmt.Println("  2) Live mode — configure xAI API key")
+	fmt.Println("  3) Skip")
+	fmt.Println()
+
+	var choice string
+	for {
+		fmt.Print("Enter choice [1-3]: ")
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			fmt.Printf("❌ Error reading input: %v\n", err)
+			os.Exit(1)
+		}
+		choice = strings.TrimSpace(input)
+		if choice == "1" || choice == "2" || choice == "3" {
+			break
+		}
+		fmt.Println("❌ Please enter 1, 2, or 3.")
+	}
+
+	switch choice {
+	case "1":
+		fmt.Println()
+		fmt.Println("🧪 Mock mode setup")
+		fmt.Println("------------------")
+		fmt.Println("Add this to your MCP client config:")
+		fmt.Println()
+		fmt.Println(`  "env": { "GROK_IMAGE_MOCK": "1" }`)
+		fmt.Println()
+		fmt.Println("Or run the server with:  grok-image-mcp --mock")
+		fmt.Println()
+		fmt.Println("See README Client Integration for Grok Build, Cursor, Claude, OpenCode, and more.")
+		fmt.Println("Project examples: .grok/config.toml, .mcp.json, .cursor/mcp.json")
+		return
+	case "3":
+		fmt.Println("Setup skipped.")
+		return
+	}
+
+	fmt.Println()
+	fmt.Println("This wizard will help you configure your xAI API key for live mode.")
 	fmt.Println()
 
 	var apiKey string

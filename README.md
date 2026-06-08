@@ -104,7 +104,7 @@ go build -o grok-image-mcp .
 
 See **[Client Integration](#client-integration)** below for Grok Build, Cursor, Claude, OpenCode, VS Code, Windsurf, and Docker.
 
-**Clone-and-go:** this repo ships with project-level mock configs — [`.grok/config.toml`](.grok/config.toml) (Grok Build) and [`.mcp.json`](.mcp.json) (Claude Code). Open the repo in either client and the tools load automatically (uses `go run .`, no pre-build needed).
+**Clone-and-go:** this repo ships with project-level mock configs — [`.grok/config.toml`](.grok/config.toml) (Grok Build), [`.mcp.json`](.mcp.json) (Claude Code), and [`.cursor/mcp.json`](.cursor/mcp.json) (Cursor). Open the repo in any of these clients and the tools load automatically (uses `go run .`, no pre-build needed).
 
 ### 3. Verify
 
@@ -347,11 +347,12 @@ Config file fallback: `~/.grok-image-config.json` via the `configure_xai_token` 
 | Method | Command |
 |---|---|
 | **Local build** | `go build -o grok-image-mcp .` |
-| **Setup wizard** | `./grok-image-mcp --setup` |
+| **Setup wizard** | `./grok-image-mcp --setup` (mock or live) |
+| **CLI help** | `./grok-image-mcp --help` / `--version` |
 | **Pre-built binary** | [GitHub Releases](https://github.com/notfixingit3/grok-image-mcp/releases) |
 | **Docker** | `docker build -t grok-image-mcp .` |
 
-Docker MCP config:
+Docker MCP config (live):
 
 ```json
 {
@@ -363,6 +364,33 @@ Docker MCP config:
   }
 }
 ```
+
+Docker MCP config (mock — no credits):
+
+```json
+{
+  "mcpServers": {
+    "grok-image-mcp": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "-e", "GROK_IMAGE_MOCK=1", "grok-image-mcp"]
+    }
+  }
+}
+```
+
+---
+
+## Troubleshooting
+
+| Issue | What to do |
+|---|---|
+| **HTTP 403 — no credits/licenses** | Add credits at [console.x.ai](https://console.x.ai). The server surfaces this with a direct link. |
+| **HTTP 429 — rate limit** | Server retries automatically (up to 3 attempts). Wait and retry, or use `serviceTier: "default"`. |
+| **Tools not visible in client** | Confirm binary path is absolute, restart/reload MCP, run `grok mcp doctor grok-image-mcp` (Grok Build). |
+| **No xAI key yet** | Use mock mode: `GROK_IMAGE_MOCK=1` or `./grok-image-mcp --mock`. Run `./scripts/test_mock.sh` to verify. |
+| **Empty or invalid tool args** | v0.2+ validates prompts, enums, and ranges before calling xAI — check the error message. |
+
+**Pricing (live mode):** `grok-imagine-image` ~$0.02/image · `grok-imagine-image-quality` ~$0.05/image. See [xAI Imagine docs](https://docs.x.ai/developers/model-capabilities/imagine).
 
 ---
 
@@ -380,10 +408,10 @@ Override with `GROK_IMAGES_DIR`.
 
 ## Contributing
 
-- **`dev`** — active development
+- **`dev`** — active development, pre-releases tagged `v*.*.*-beta.*`
 - **`main`** — stable releases (`v*.*.*`)
 
-Changes go to `dev`, then PR to `main`.
+Changes go to `dev`, then PR to `main`. Tag betas on `dev` (e.g. `v0.2.0-beta.0`), stable releases on `main`.
 
 ---
 

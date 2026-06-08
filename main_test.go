@@ -245,6 +245,40 @@ func TestMockSampleImageBytes(t *testing.T) {
 	}
 }
 
+func TestValidateGenerateImageArgs(t *testing.T) {
+	if err := validateGenerateImageArgs("", nil, nil, nil, nil, nil); err == nil {
+		t.Fatal("expected empty prompt error")
+	}
+
+	badRatio := "99:99"
+	if err := validateGenerateImageArgs("hello", nil, &badRatio, nil, nil, nil); err == nil || !strings.Contains(err.Error(), "aspectRatio") {
+		t.Fatalf("expected aspectRatio error, got: %v", err)
+	}
+
+	tooMany := 11
+	if err := validateGenerateImageArgs("hello", nil, nil, nil, nil, &tooMany); err == nil || !strings.Contains(err.Error(), "numberOfImages") {
+		t.Fatalf("expected numberOfImages error, got: %v", err)
+	}
+
+	ratio := "1:1"
+	res := "2k"
+	tier := "priority"
+	model := "grok-imagine-image"
+	count := 3
+	if err := validateGenerateImageArgs("hello", &model, &ratio, &res, &tier, &count); err != nil {
+		t.Fatalf("valid args rejected: %v", err)
+	}
+}
+
+func TestValidateEditImageArgs(t *testing.T) {
+	if err := validateEditImageArgs("", "edit me", nil, nil, nil, nil, nil); err == nil {
+		t.Fatal("expected empty imagePath error")
+	}
+	if err := validateEditImageArgs("/tmp/test.png", "   ", nil, nil, nil, nil, nil); err == nil {
+		t.Fatal("expected empty prompt error")
+	}
+}
+
 func TestToolsListJSON(t *testing.T) {
 	tools := getToolsList()
 	if len(tools) != 6 {
