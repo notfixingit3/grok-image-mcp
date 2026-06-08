@@ -15,6 +15,7 @@ import (
 
 const grokOAuthRefreshBuffer = 5 * time.Minute
 
+// #nosec G101 -- public xAI OAuth token endpoint URL, not a credential
 var grokOAuthTokenEndpoint = "https://auth.x.ai/oauth2/token"
 
 type grokAuthEntry struct {
