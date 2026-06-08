@@ -417,64 +417,7 @@ func handleToolCall(id interface{}, toolName string, arguments json.RawMessage) 
 		return
 	}
 
-	if apiKey == "" {
-		sendError(id, -32603, "xAI API token not configured. Use configure_xai_token first.", nil)
-		return
-	}
-
-	switch toolName {
-	case "generate_image":
-		var args struct {
-			Prompt         string  `json:"prompt"`
-			Model          *string `json:"model"`
-			AspectRatio    *string `json:"aspectRatio"`
-			Resolution     *string `json:"resolution"`
-			NumberOfImages *int    `json:"numberOfImages"`
-		}
-		if err := json.Unmarshal(arguments, &args); err != nil {
-			sendError(id, -32602, "Invalid arguments", err.Error())
-			return
-		}
-		handleGenerateImage(id, apiKey, args.Prompt, args.Model, args.AspectRatio, args.Resolution, args.NumberOfImages)
-
-	case "edit_image":
-		var args struct {
-			ImagePath       string   `json:"imagePath"`
-			Prompt          string   `json:"prompt"`
-			ReferenceImages []string `json:"referenceImages"`
-			Model           *string  `json:"model"`
-			AspectRatio     *string  `json:"aspectRatio"`
-			Resolution      *string  `json:"resolution"`
-		}
-		if err := json.Unmarshal(arguments, &args); err != nil {
-			sendError(id, -32602, "Invalid arguments", err.Error())
-			return
-		}
-		handleEditImage(id, apiKey, args.ImagePath, args.Prompt, args.ReferenceImages, args.Model, args.AspectRatio, args.Resolution)
-
-	case "continue_editing":
-		var args struct {
-			Prompt          string   `json:"prompt"`
-			ReferenceImages []string `json:"referenceImages"`
-			Model           *string  `json:"model"`
-			AspectRatio     *string  `json:"aspectRatio"`
-			Resolution      *string  `json:"resolution"`
-		}
-		if err := json.Unmarshal(arguments, &args); err != nil {
-			sendError(id, -32602, "Invalid arguments", err.Error())
-			return
-		}
-		if lastImagePath == "" {
-			sendError(id, -32603, "No previous image found. Please generate or edit an image first.", nil)
-			return
-		}
-		if _, err := os.Stat(lastImagePath); os.IsNotExist(err) {
-			sendError(id, -32603, fmt.Sprintf("Last image file not found at: %s. Please generate a new image.", lastImagePath), nil)
-			return
-		}
-		handleEditImage(id, apiKey, lastImagePath, args.Prompt, args.ReferenceImages, args.Model, args.AspectRatio, args.Resolution)
-
-	case "get_last_image_info":
+	if toolName == "get_last_image_info" {
 		if lastImagePath == "" {
 			sendResponse(id, map[string]interface{}{
 				"content": []map[string]interface{}{
@@ -506,6 +449,74 @@ func handleToolCall(id interface{}, toolName string, arguments json.RawMessage) 
 				},
 			},
 		})
+		return
+	}
+
+	if toolName == "continue_editing" {
+		var args struct {
+			Prompt          string   `json:"prompt"`
+			ReferenceImages []string `json:"referenceImages"`
+			Model           *string  `json:"model"`
+			AspectRatio     *string  `json:"aspectRatio"`
+			Resolution      *string  `json:"resolution"`
+		}
+		if err := json.Unmarshal(arguments, &args); err != nil {
+			sendError(id, -32602, "Invalid arguments", err.Error())
+			return
+		}
+		if lastImagePath == "" {
+			sendError(id, -32603, "No previous image found. Please generate or edit an image first.", nil)
+			return
+		}
+		if _, err := os.Stat(lastImagePath); os.IsNotExist(err) {
+			sendError(id, -32603, fmt.Sprintf("Last image file not found at: %s. Please generate a new image.", lastImagePath), nil)
+			return
+		}
+		if apiKey == "" {
+			sendError(id, -32603, "xAI API token not configured. Use configure_xai_token first.", nil)
+			return
+		}
+		handleEditImage(id, apiKey, lastImagePath, args.Prompt, args.ReferenceImages, args.Model, args.AspectRatio, args.Resolution)
+		return
+	}
+
+	switch toolName {
+	case "generate_image":
+		if apiKey == "" {
+			sendError(id, -32603, "xAI API token not configured. Use configure_xai_token first.", nil)
+			return
+		}
+		var args struct {
+			Prompt         string  `json:"prompt"`
+			Model          *string `json:"model"`
+			AspectRatio    *string `json:"aspectRatio"`
+			Resolution     *string `json:"resolution"`
+			NumberOfImages *int    `json:"numberOfImages"`
+		}
+		if err := json.Unmarshal(arguments, &args); err != nil {
+			sendError(id, -32602, "Invalid arguments", err.Error())
+			return
+		}
+		handleGenerateImage(id, apiKey, args.Prompt, args.Model, args.AspectRatio, args.Resolution, args.NumberOfImages)
+
+	case "edit_image":
+		if apiKey == "" {
+			sendError(id, -32603, "xAI API token not configured. Use configure_xai_token first.", nil)
+			return
+		}
+		var args struct {
+			ImagePath       string   `json:"imagePath"`
+			Prompt          string   `json:"prompt"`
+			ReferenceImages []string `json:"referenceImages"`
+			Model           *string  `json:"model"`
+			AspectRatio     *string  `json:"aspectRatio"`
+			Resolution      *string  `json:"resolution"`
+		}
+		if err := json.Unmarshal(arguments, &args); err != nil {
+			sendError(id, -32602, "Invalid arguments", err.Error())
+			return
+		}
+		handleEditImage(id, apiKey, args.ImagePath, args.Prompt, args.ReferenceImages, args.Model, args.AspectRatio, args.Resolution)
 
 	default:
 		sendError(id, -32601, fmt.Sprintf("Unknown tool: %s", toolName), nil)
@@ -644,6 +655,25 @@ type ImageResponse struct {
 	Data []ImageData `json:"data"`
 }
 
+func formatXAIError(statusCode int, bodyBytes []byte) string {
+	message := fmt.Sprintf("xAI API call failed with status %d", statusCode)
+	var errResp struct {
+		Code  string `json:"code"`
+		Error string `json:"error"`
+	}
+	if err := json.Unmarshal(bodyBytes, &errResp); err == nil {
+		if errResp.Error != "" {
+			message = errResp.Error
+		} else if errResp.Code != "" {
+			message = errResp.Code
+		}
+	}
+	if statusCode == http.StatusForbidden && strings.Contains(strings.ToLower(message), "credit") {
+		message += " Add credits or licenses at https://console.x.ai before using image generation."
+	}
+	return message
+}
+
 func encodeImageAsDataURI(imagePath string) (string, error) {
 	// #nosec G304 - reading image path is intentional and requested by user/client
 	imgData, err := os.ReadFile(imagePath)
@@ -683,7 +713,7 @@ func doXAIRequest(ctx context.Context, apiKey, endpoint string, payload interfac
 
 	if resp.StatusCode != http.StatusOK {
 		logMessage("xAI API call failed with status %d: %s", resp.StatusCode, string(bodyBytes))
-		return nil, resp.StatusCode, bodyBytes, fmt.Errorf("xAI API call failed with status %d", resp.StatusCode)
+		return nil, resp.StatusCode, bodyBytes, fmt.Errorf("%s", formatXAIError(resp.StatusCode, bodyBytes))
 	}
 
 	logMessage("xAI API call succeeded with status %d", resp.StatusCode)

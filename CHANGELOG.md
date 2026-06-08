@@ -7,7 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2026-06-08
 
+### Changed
+- Improved xAI API error messages when credits/licenses are missing.
+- `get_last_image_info` and `continue_editing` guard checks no longer require an API key.
+
 ### Added
+- Grok Imagine-generated logo and sample output in `assets/`.
+- `TEST_REPORT.md` with conversion checklist and test results.
+- `scripts/test_protocol.sh` for MCP protocol tests without API credits.
+- `scripts/test_all.sh` for full integration testing.
+- `scripts/generate_assets.sh` to dogfood asset generation through the MCP server.
 - Initial release of `grok-image-mcp`, adapted from [nano-banana-mcpv2](https://github.com/notfixingit3/nano-banana-mcpv2).
 - MCP tools: `generate_image`, `edit_image`, `continue_editing`, `get_last_image_info`, `get_configuration_status`, `configure_xai_token`.
 - xAI Grok Imagine API integration via `POST /v1/images/generations` and `POST /v1/images/edits`.

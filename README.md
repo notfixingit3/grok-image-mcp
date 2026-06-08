@@ -1,8 +1,34 @@
+<p align="center">
+  <img src="assets/logo.png" alt="Grok Image MCP Logo" width="300" />
+</p>
+
+<p align="center">
+  <sub><i>Logo generated using Grok Imagine</i></sub>
+</p>
+
+<p align="center">
+  <a href="https://github.com/notfixingit3/grok-image-mcp/actions/workflows/release.yml"><img src="https://github.com/notfixingit3/grok-image-mcp/actions/workflows/release.yml/badge.svg" alt="Release Workflow Status" /></a>
+  <a href="https://github.com/notfixingit3/grok-image-mcp/releases"><img src="https://img.shields.io/github/v/release/notfixingit3/grok-image-mcp?include_prereleases" alt="Latest Release" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/notfixingit3/grok-image-mcp" alt="License" /></a>
+</p>
+
 # Grok Image MCP Server
 
 An MCP (Model Context Protocol) server that provides AI image generation and editing using xAI's Grok Imagine API (`grok-imagine-image` / `grok-imagine-image-quality`).
 
-This project is a Grok/xAI adaptation of [nano-banana-mcpv2](https://github.com/notfixingit3/nano-banana-mcpv2), which uses Google's Gemini image APIs.
+This is a Grok/xAI adaptation of [nano-banana-mcpv2](https://github.com/notfixingit3/nano-banana-mcpv2), which uses Google's Gemini image APIs.
+
+---
+
+### Sample Output (Grok Imagine)
+
+Preview image generated with `grok-imagine-image-quality`:
+
+<p align="center">
+  <img src="assets/sample_output.png" alt="Grok Imagine Sample Output" width="400" />
+</p>
+
+For conversion verification, protocol tests, and API diagnostics, see [TEST_REPORT.md](TEST_REPORT.md).
 
 ---
 
@@ -13,6 +39,7 @@ This project is a Grok/xAI adaptation of [nano-banana-mcpv2](https://github.com/
 - **Iterative Editing**: Refine the last generated or edited image sequentially.
 - **Dynamic Model Selection**: Choose models via tool parameters or environment variables.
 - **Cross-Platform Auto-Saving**: Automatically saves generated images locally.
+- **Zero-Publish Install**: Build locally or install from GitHub releases.
 
 ---
 
@@ -39,11 +66,20 @@ The server checks configuration in the following priority:
 
 ---
 
-## Getting Your API Key
+## Getting Your API Key & xAI Credits
 
+### How to Get Your API Key
 1. Go to [console.x.ai](https://console.x.ai).
-2. Create an API key.
+2. Create an API key for your team.
 3. Set it via `XAI_API_KEY` or the `configure_xai_token` tool.
+
+### Credits Required
+Image generation and editing require an xAI team with active credits or licenses. Without credits, authenticated requests return HTTP 403. Purchase credits at [console.x.ai](https://console.x.ai).
+
+### Pricing (as of 2026)
+- **`grok-imagine-image`**: $0.02 per image
+- **`grok-imagine-image-quality`**: $0.05 per image
+- Image edits are billed for both input and output images
 
 ---
 
@@ -55,11 +91,17 @@ The server checks configuration in the following priority:
 go build -o grok-image-mcp main.go
 ```
 
-To verify image generation over stdio:
+Protocol tests (no API credits needed):
+
+```bash
+./scripts/test_protocol.sh
+```
+
+Full integration test (requires xAI credits):
 
 ```bash
 export XAI_API_KEY="your-api-key-here"
-./scripts/test_generation.sh
+./scripts/test_all.sh
 ```
 
 Add this to your MCP settings file (e.g., Cursor, Claude Desktop, or Claude Code config):
@@ -85,7 +127,11 @@ go build -o grok-image-mcp main.go
 ./grok-image-mcp --setup
 ```
 
-### Method C: Run via Docker
+### Method C: Download Pre-compiled Binary
+
+Download binaries for macOS ARM64/AMD64, Linux AMD64, or Windows from [GitHub Releases](https://github.com/notfixingit3/grok-image-mcp/releases).
+
+### Method D: Run via Docker
 
 ```bash
 docker build -t grok-image-mcp .
@@ -142,11 +188,24 @@ Refine the last image generated/edited in the active session.
 Check details of the last generated/edited image (file path, file size, last modified timestamp).
 
 ### `get_configuration_status`
-Verify if the xAI token is configured and see its source.
+Verify if the xAI token is configured and see its origin source.
 
 ### `configure_xai_token`
 Configure your xAI API key:
 - **`apiKey`** (required): Your xAI API key.
+
+---
+
+## Differences from nano-banana-mcpv2
+
+| Feature | nano-banana-mcpv2 | grok-image-mcp |
+|---|---|---|
+| API Provider | Google Gemini / Imagen | xAI Grok Imagine |
+| Auth | Query param `?key=` | `Authorization: Bearer` header |
+| `generate_imagen` tool | Yes (Imagen 4) | No (not applicable) |
+| Max reference images | Unlimited in schema | 3 (xAI API limit) |
+| Batch generation | Up to 4 (Imagen) | Up to 10 (xAI) |
+| Resolution control | Via aspect ratio | `1k` / `2k` explicit |
 
 ---
 
