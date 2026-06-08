@@ -36,6 +36,7 @@ func mockModeSuffix() string {
 
 func mockSampleImageBytes() ([]byte, string, error) {
 	if custom := strings.TrimSpace(os.Getenv("GROK_IMAGE_MOCK_ASSET")); custom != "" {
+		// #nosec G304 G703 - mock asset path is user-configured from environment variable
 		data, err := os.ReadFile(custom)
 		if err != nil {
 			return nil, "", err
@@ -48,6 +49,7 @@ func mockSampleImageBytes() ([]byte, string, error) {
 		"assets/logo.png",
 	}
 	for _, candidate := range candidates {
+		// #nosec G304 - bundled sample asset paths are fixed and intentional
 		if data, err := os.ReadFile(candidate); err == nil {
 			return data, getMimeType(candidate), nil
 		}
@@ -69,7 +71,7 @@ func saveMockImage(prefix string, source []byte, mimeType string) (string, strin
 	fileName := fmt.Sprintf("%s-%s-%s%s", prefix, timestamp, randomID, ext)
 	filePath := filepath.Join(imagesDir, fileName)
 
-	// #nosec G306 - generated image files must be user-viewable (0644)
+	// #nosec G306 G703 - generated image files must be user-viewable; path is server-controlled under images dir
 	if err := os.WriteFile(filePath, source, 0644); err != nil {
 		return "", "", err
 	}
@@ -146,6 +148,7 @@ func handleMockEditImage(id interface{}, imagePath, prompt string, referenceImag
 		return
 	}
 
+	// #nosec G304 - reading image path is intentional and requested by user/client
 	source, err := os.ReadFile(imagePath)
 	if err != nil {
 		sendError(id, -32603, fmt.Sprintf("Failed to read image at %s", imagePath), err.Error())

@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Example MCP configs in `examples/` for Cursor (mock and live).
 
 ### Changed
+- Polished README with dual-mode table, quick start, and centered logo hero.
+- Resolved all `gosec` findings with documented `#nosec` annotations.
 - Image tools skip API key requirement when mock mode is active.
 - `configure_xai_token` skips live validation in mock mode.
 - CI now runs mock integration tests on every push.

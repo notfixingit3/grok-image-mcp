@@ -136,6 +136,6 @@ The server now surfaces this with a clearer message pointing to https://console.
 | Grok-generated logo & sample assets | ✅ Complete |
 | MCP protocol / stdio tests | ✅ Passed |
 | Go unit tests | ✅ Passed |
-| CI workflow (test + gosec) | ✅ Added |
+| CI workflow (test + gosec) | ✅ Passing (0 issues) |
 | Mock integration tests | ✅ Passed |
 | Live xAI image generation/editing | ⏳ Blocked (no API credits) |
