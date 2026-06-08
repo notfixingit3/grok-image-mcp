@@ -8,11 +8,20 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/notfixingit3/grok-image-mcp/actions/workflows/ci.yml"><img src="https://github.com/notfixingit3/grok-image-mcp/actions/workflows/ci.yml/badge.svg" alt="CI Status" /></a>
-  <a href="https://github.com/notfixingit3/grok-image-mcp/actions/workflows/release.yml"><img src="https://github.com/notfixingit3/grok-image-mcp/actions/workflows/release.yml/badge.svg" alt="Release Workflow Status" /></a>
-  <a href="https://github.com/notfixingit3/grok-image-mcp/releases"><img src="https://img.shields.io/github/v/release/notfixingit3/grok-image-mcp?include_prereleases" alt="Latest Release" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/notfixingit3/grok-image-mcp" alt="License" /></a>
+  <a href="https://github.com/notfixingit3/grok-image-mcp/actions/workflows/ci.yml"><img src="https://github.com/notfixingit3/grok-image-mcp/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/notfixingit3/grok-image-mcp/actions/workflows/release.yml"><img src="https://github.com/notfixingit3/grok-image-mcp/actions/workflows/release.yml/badge.svg" alt="Release" /></a>
+  <a href="https://github.com/notfixingit3/grok-image-mcp/releases"><img src="https://img.shields.io/github/v/release/notfixingit3/grok-image-mcp?include_prereleases&label=release" alt="Latest Release" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/notfixingit3/grok-image-mcp?label=license" alt="License" /></a>
+  <a href="https://github.com/notfixingit3/grok-image-mcp"><img src="https://img.shields.io/github/stars/notfixingit3/grok-image-mcp?style=flat&label=stars" alt="Stars" /></a>
+</p>
+
+<p align="center">
+  <a href="https://go.dev"><img src="https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go&logoColor=white" alt="Go 1.22+" /></a>
+  <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP-stdio-8B5CF6" alt="MCP" /></a>
+  <a href="https://docs.x.ai/developers/model-capabilities/imagine"><img src="https://img.shields.io/badge/xAI-Grok%20Imagine-000000" alt="xAI Grok Imagine" /></a>
   <a href="TEST_REPORT.md"><img src="https://img.shields.io/badge/tests-mock%20%2B%20protocol-brightgreen" alt="Tests" /></a>
+  <a href="examples/cursor-mcp.json"><img src="https://img.shields.io/badge/mock%20mode-free-blue" alt="Mock Mode" /></a>
+  <a href="https://www.cursor.com"><img src="https://img.shields.io/badge/Cursor-compatible-222222" alt="Cursor" /></a>
 </p>
 
 # Grok Image MCP Server
