@@ -32,6 +32,6 @@ jobs:
         run: ./scripts/test_mock.sh
 
       - name: Run gosec security scan
-        uses: securego/gosec@master
-        with:
-          args: ./...
+        run: |
+          go install github.com/securego/gosec/v2/cmd/gosec@v2.22.2
+          gosec -fmt=text ./...
