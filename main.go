@@ -19,7 +19,7 @@ import (
 
 const (
 	ServerName    = "grok-image-mcp"
-	ServerVersion = "0.1.1"
+	ServerVersion = "0.1.2"
 	XAIBaseURL    = "https://api.x.ai/v1"
 )
 
@@ -61,16 +61,25 @@ type InputSchema struct {
 }
 
 var (
-	lastImagePath string
-	httpClient    = &http.Client{Timeout: 120 * time.Second}
-	logFile       *os.File
-	globalCtx     context.Context
+	lastImagePath    string
+	httpClient       = &http.Client{Timeout: 120 * time.Second}
+	logFile          *os.File
+	globalCtx        context.Context
+	mockModeEnabled  bool
 )
 
 func main() {
 	if len(os.Args) > 1 && (os.Args[1] == "--setup" || os.Args[1] == "-setup") {
 		runSetupWizard()
 		return
+	}
+	if len(os.Args) > 1 && (os.Args[1] == "--mock" || os.Args[1] == "-mock") {
+		mockModeEnabled = true
+		os.Args = append(os.Args[:1], os.Args[2:]...)
+	}
+
+	if isMockMode() {
+		fmt.Fprintln(os.Stderr, "[grok-image-mcp] Mock mode enabled — image tools run offline without xAI credits")
 	}
 
 	logPath := os.Getenv("GROK_IMAGE_LOG_FILE")
@@ -405,10 +414,12 @@ func handleToolCall(id interface{}, toolName string, arguments json.RawMessage) 
 		if ctx == nil {
 			ctx = context.Background()
 		}
-		statusCode, bodyBytes, err := validateAPIKey(ctx, args.APIKey)
-		if err != nil {
-			sendError(id, -32603, formatValidationFailure(statusCode, bodyBytes), string(bodyBytes))
-			return
+		if !isMockMode() {
+			statusCode, bodyBytes, err := validateAPIKey(ctx, args.APIKey)
+			if err != nil {
+				sendError(id, -32603, formatValidationFailure(statusCode, bodyBytes), string(bodyBytes))
+				return
+			}
 		}
 		if err := saveConfig(args.APIKey); err != nil {
 			sendError(id, -32603, "Failed to save configuration", err.Error())
@@ -418,7 +429,7 @@ func handleToolCall(id interface{}, toolName string, arguments json.RawMessage) 
 			"content": []map[string]interface{}{
 				{
 					"type": "text",
-					"text": "✅ xAI API token configured successfully! You can now use Grok Imagine image generation features.",
+					"text": "✅ xAI API token configured successfully! You can now use Grok Imagine image generation features." + mockModeSuffix(),
 				},
 			},
 		})
@@ -429,7 +440,13 @@ func handleToolCall(id interface{}, toolName string, arguments json.RawMessage) 
 		isConfigured := apiKey != ""
 		statusText := "❌ xAI API token is not configured"
 		sourceInfo := "\n\n📝 Configuration options:\n1. Environment variable: XAI_API_KEY\n2. Use configure_xai_token tool"
-		if isConfigured {
+		if isMockMode() {
+			statusText = "🧪 Mock mode is active — image tools work offline without xAI credits"
+			sourceInfo = "\n📍 Set GROK_IMAGE_MOCK=1 or run with --mock to enable"
+			if isConfigured {
+				sourceInfo += "\n📍 API key is also configured for when you disable mock mode"
+			}
+		} else if isConfigured {
 			_, source := loadConfig()
 			statusText = "✅ xAI API token is configured and ready to use"
 			if source == "environment" {
@@ -506,17 +523,21 @@ func handleToolCall(id interface{}, toolName string, arguments json.RawMessage) 
 			sendError(id, -32603, fmt.Sprintf("Last image file not found at: %s. Please generate a new image.", lastImagePath), nil)
 			return
 		}
-		if apiKey == "" {
+		if !isMockMode() && apiKey == "" {
 			sendError(id, -32603, "xAI API token not configured. Use configure_xai_token first.", nil)
 			return
 		}
-		handleEditImage(id, apiKey, lastImagePath, args.Prompt, args.ReferenceImages, args.Model, args.AspectRatio, args.Resolution, args.NumberOfImages, args.ServiceTier)
+		if isMockMode() {
+			handleMockEditImage(id, lastImagePath, args.Prompt, args.ReferenceImages, args.Model, args.AspectRatio, args.Resolution, args.NumberOfImages, args.ServiceTier)
+		} else {
+			handleEditImage(id, apiKey, lastImagePath, args.Prompt, args.ReferenceImages, args.Model, args.AspectRatio, args.Resolution, args.NumberOfImages, args.ServiceTier)
+		}
 		return
 	}
 
 	switch toolName {
 	case "generate_image":
-		if apiKey == "" {
+		if !isMockMode() && apiKey == "" {
 			sendError(id, -32603, "xAI API token not configured. Use configure_xai_token first.", nil)
 			return
 		}
@@ -532,10 +553,14 @@ func handleToolCall(id interface{}, toolName string, arguments json.RawMessage) 
 			sendError(id, -32602, "Invalid arguments", err.Error())
 			return
 		}
-		handleGenerateImage(id, apiKey, args.Prompt, args.Model, args.AspectRatio, args.Resolution, args.NumberOfImages, args.ServiceTier)
+		if isMockMode() {
+			handleMockGenerateImage(id, args.Prompt, args.Model, args.AspectRatio, args.Resolution, args.NumberOfImages, args.ServiceTier)
+		} else {
+			handleGenerateImage(id, apiKey, args.Prompt, args.Model, args.AspectRatio, args.Resolution, args.NumberOfImages, args.ServiceTier)
+		}
 
 	case "edit_image":
-		if apiKey == "" {
+		if !isMockMode() && apiKey == "" {
 			sendError(id, -32603, "xAI API token not configured. Use configure_xai_token first.", nil)
 			return
 		}
@@ -553,7 +578,11 @@ func handleToolCall(id interface{}, toolName string, arguments json.RawMessage) 
 			sendError(id, -32602, "Invalid arguments", err.Error())
 			return
 		}
-		handleEditImage(id, apiKey, args.ImagePath, args.Prompt, args.ReferenceImages, args.Model, args.AspectRatio, args.Resolution, args.NumberOfImages, args.ServiceTier)
+		if isMockMode() {
+			handleMockEditImage(id, args.ImagePath, args.Prompt, args.ReferenceImages, args.Model, args.AspectRatio, args.Resolution, args.NumberOfImages, args.ServiceTier)
+		} else {
+			handleEditImage(id, apiKey, args.ImagePath, args.Prompt, args.ReferenceImages, args.Model, args.AspectRatio, args.Resolution, args.NumberOfImages, args.ServiceTier)
+		}
 
 	default:
 		sendError(id, -32601, fmt.Sprintf("Unknown tool: %s", toolName), nil)

@@ -212,6 +212,39 @@ func TestDoXAIRequestRetriesOn429(t *testing.T) {
 	}
 }
 
+func TestIsMockMode(t *testing.T) {
+	t.Setenv("GROK_IMAGE_MOCK", "")
+	mockModeEnabled = false
+	if isMockMode() {
+		t.Fatal("expected mock mode disabled")
+	}
+
+	t.Setenv("GROK_IMAGE_MOCK", "1")
+	if !isMockMode() {
+		t.Fatal("expected mock mode enabled via env")
+	}
+
+	mockModeEnabled = true
+	t.Setenv("GROK_IMAGE_MOCK", "")
+	if !isMockMode() {
+		t.Fatal("expected mock mode enabled via flag")
+	}
+	mockModeEnabled = false
+}
+
+func TestMockSampleImageBytes(t *testing.T) {
+	data, mime, err := mockSampleImageBytes()
+	if err != nil {
+		t.Fatalf("mockSampleImageBytes failed: %v", err)
+	}
+	if len(data) == 0 {
+		t.Fatal("expected image bytes")
+	}
+	if mime == "" {
+		t.Fatal("expected mime type")
+	}
+}
+
 func TestToolsListJSON(t *testing.T) {
 	tools := getToolsList()
 	if len(tools) != 6 {

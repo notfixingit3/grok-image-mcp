@@ -28,6 +28,9 @@ jobs:
       - name: Run protocol tests
         run: ./scripts/test_protocol.sh
 
+      - name: Run mock integration tests
+        run: ./scripts/test_mock.sh
+
       - name: Run gosec security scan
         uses: securego/gosec@master
         with:

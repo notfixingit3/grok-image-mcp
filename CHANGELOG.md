@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2026-06-08
+
+### Added
+- **Mock mode** (`GROK_IMAGE_MOCK=1` or `--mock`) for free offline development without xAI credits.
+- `scripts/test_mock.sh` — full generate/edit/continue integration test using mock mode.
+- Example MCP configs in `examples/` for Cursor (mock and live).
+
+### Changed
+- Image tools skip API key requirement when mock mode is active.
+- `configure_xai_token` skips live validation in mock mode.
+- CI now runs mock integration tests on every push.
+
 ## [0.1.1] - 2026-06-08
 
 ### Added

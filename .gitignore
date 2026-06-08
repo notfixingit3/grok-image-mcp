@@ -25,3 +25,4 @@ coverage/
 grok-image-mcp
 generated_imgs/
 .test-output-dir/
+.test-mock-output/

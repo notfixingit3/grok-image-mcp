@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "grok-image-mcp": {
+      "command": "/path/to/grok-image-mcp",
+      "env": {
+        "XAI_API_KEY": "your-xai-api-key-here",
+        "GROK_IMAGE_MODEL": "grok-imagine-image-quality"
+      }
+    }
+  }
+}

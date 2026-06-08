@@ -2,7 +2,7 @@
 
 This report documents the local integration and visual verification tests performed for the initial `grok-image-mcp` release.
 
-## Version: `v0.1.1` (dev)
+## Version: `v0.1.2` (dev)
 - **Build Date**: 2026-06-08
 - **Platform**: macOS arm64 (`darwin/arm64`)
 - **Go Version**: `go1.22+`
@@ -80,6 +80,24 @@ Logo and sample output were generated with Grok Imagine and saved to `assets/`:
 
 ---
 
+## Mock Integration Tests (No API Key Required)
+
+Run with:
+
+```bash
+export GROK_IMAGE_MOCK=1
+./scripts/test_mock.sh
+```
+
+**Result: PASSED**
+
+Verified full offline flow:
+- `generate_image` saves real files using `assets/sample_output.png`
+- `continue_editing` works in a persistent server session (same as real MCP clients)
+- `edit_image` and `get_last_image_info` work without xAI credits
+
+---
+
 ## Live xAI API Integration Test
 
 Run with:
@@ -119,4 +137,5 @@ The server now surfaces this with a clearer message pointing to https://console.
 | MCP protocol / stdio tests | ✅ Passed |
 | Go unit tests | ✅ Passed |
 | CI workflow (test + gosec) | ✅ Added |
+| Mock integration tests | ✅ Passed |
 | Live xAI image generation/editing | ⏳ Blocked (no API credits) |

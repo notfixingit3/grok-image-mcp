@@ -7,6 +7,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/notfixingit3/grok-image-mcp/actions/workflows/ci.yml"><img src="https://github.com/notfixingit3/grok-image-mcp/actions/workflows/ci.yml/badge.svg" alt="CI Status" /></a>
   <a href="https://github.com/notfixingit3/grok-image-mcp/actions/workflows/release.yml"><img src="https://github.com/notfixingit3/grok-image-mcp/actions/workflows/release.yml/badge.svg" alt="Release Workflow Status" /></a>
   <a href="https://github.com/notfixingit3/grok-image-mcp/releases"><img src="https://img.shields.io/github/v/release/notfixingit3/grok-image-mcp?include_prereleases" alt="Latest Release" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/notfixingit3/grok-image-mcp" alt="License" /></a>
@@ -29,6 +30,25 @@ Preview image generated with `grok-imagine-image-quality`:
 </p>
 
 For conversion verification, protocol tests, and API diagnostics, see [TEST_REPORT.md](TEST_REPORT.md).
+
+---
+
+## Free Development (No API Key Required)
+
+**No xAI credits? No problem.** Enable mock mode to exercise the full MCP workflow offline:
+
+```bash
+export GROK_IMAGE_MOCK=1
+go build -o grok-image-mcp .
+./scripts/test_mock.sh
+```
+
+Mock mode:
+- Runs `generate_image`, `edit_image`, and `continue_editing` without calling xAI
+- Saves real image files to disk (uses `assets/sample_output.png` as a stand-in)
+- Works in MCP clients — see [examples/cursor-mcp.json](examples/cursor-mcp.json)
+
+When you eventually have credits, unset `GROK_IMAGE_MOCK` and add `XAI_API_KEY`.
 
 ---
 
@@ -62,6 +82,8 @@ The server checks configuration in the following priority:
    - `XAI_API_KEY`: Your xAI API key from [console.x.ai](https://console.x.ai).
    - `GROK_IMAGE_MODEL`: Set a default model server-wide (e.g., `grok-imagine-image-quality`).
    - `GROK_IMAGES_DIR`: Custom directory for saved images (overrides platform defaults).
+   - `GROK_IMAGE_MOCK`: Set to `1` for free offline development without an API key.
+   - `GROK_IMAGE_MOCK_ASSET`: Optional image file to use as mock output (defaults to `assets/sample_output.png`).
    - `GROK_IMAGE_LOG_FILE`: Optional path for request/response logging.
 3. **Global Configuration**: `~/.grok-image-config.json` generated via the `configure_xai_token` tool.
 
@@ -92,13 +114,15 @@ Image generation and editing require an xAI team with active credits or licenses
 go build -o grok-image-mcp .
 ```
 
-Protocol tests (no API credits needed):
+Offline tests (no API key or credits needed):
 
 ```bash
-./scripts/test_protocol.sh
+./scripts/test_protocol.sh   # MCP protocol checks
+./scripts/test_mock.sh       # full generate/edit flow in mock mode
+go test -v ./...             # unit tests
 ```
 
-Full integration test (requires xAI credits):
+Live integration test (requires xAI credits):
 
 ```bash
 export XAI_API_KEY="your-api-key-here"
