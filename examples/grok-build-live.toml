@@ -1,0 +1,7 @@
+# Grok Build — live mode (xAI credits required)
+# Use ${XAI_API_KEY} to avoid putting secrets in the config file.
+
+[mcp_servers.grok-image-mcp]
+command = "/path/to/grok-image-mcp"
+env = { XAI_API_KEY = "${XAI_API_KEY}", GROK_IMAGE_MODEL = "grok-imagine-image-quality" }
+enabled = true

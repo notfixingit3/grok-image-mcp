@@ -26,7 +26,7 @@
 
 # Grok Image MCP Server
 
-An MCP (Model Context Protocol) server that brings **Grok Imagine** image generation and editing to Cursor, Claude Desktop, Claude Code, and any MCP-compatible client.
+An MCP (Model Context Protocol) server that brings **Grok Imagine** image generation and editing to **Grok Build**, **Cursor**, **Claude Desktop**, **Claude Code**, **OpenCode**, **VS Code**, **Windsurf**, and any MCP-compatible client.
 
 Adapted from [nano-banana-mcpv2](https://github.com/notfixingit3/nano-banana-mcpv2) (Gemini/Imagen) for xAI's image API.
 
@@ -40,7 +40,7 @@ Adapted from [nano-banana-mcpv2](https://github.com/notfixingit3/nano-banana-mcp
 | **API calls** | None | xAI Grok Imagine |
 | **Cost** | Free | ~$0.02–$0.05 / image |
 | **Use case** | Dev, testing, MCP wiring | Real image generation |
-| **Config example** | [examples/cursor-mcp.json](examples/cursor-mcp.json) | [examples/cursor-mcp-live.json](examples/cursor-mcp-live.json) |
+| **Config examples** | [examples/](examples/) (per-client) | [examples/cursor-mcp-live.json](examples/cursor-mcp-live.json) |
 
 Switch anytime: unset `GROK_IMAGE_MOCK` and add your key when you're ready for live generation.
 
@@ -100,36 +100,11 @@ cd grok-image-mcp
 go build -o grok-image-mcp .
 ```
 
-### 2. Configure MCP client
+### 2. Configure your MCP client
 
-**Mock (no key needed):**
+See **[Client Integration](#client-integration)** below for Grok Build, Cursor, Claude, OpenCode, VS Code, Windsurf, and Docker.
 
-```json
-{
-  "mcpServers": {
-    "grok-image-mcp": {
-      "command": "/path/to/grok-image-mcp",
-      "env": { "GROK_IMAGE_MOCK": "1" }
-    }
-  }
-}
-```
-
-**Live:**
-
-```json
-{
-  "mcpServers": {
-    "grok-image-mcp": {
-      "command": "/path/to/grok-image-mcp",
-      "env": {
-        "XAI_API_KEY": "your-xai-api-key-here",
-        "GROK_IMAGE_MODEL": "grok-imagine-image-quality"
-      }
-    }
-  }
-}
-```
+**Clone-and-go:** this repo ships with project-level mock configs — [`.grok/config.toml`](.grok/config.toml) (Grok Build) and [`.mcp.json`](.mcp.json) (Claude Code). Open the repo in either client and the tools load automatically (uses `go run .`, no pre-build needed).
 
 ### 3. Verify
 
@@ -138,6 +113,193 @@ go build -o grok-image-mcp .
 ./scripts/test_mock.sh       # full offline flow (no key)
 go test -v ./...             # unit tests
 ```
+
+---
+
+## Client Integration
+
+Replace `/path/to/grok-image-mcp` with your built binary (`go build -o grok-image-mcp .`) or a [release binary](https://github.com/notfixingit3/grok-image-mcp/releases). All examples below use **mock mode**; for live mode, swap `GROK_IMAGE_MOCK` for `XAI_API_KEY`.
+
+| Client | Config file | Example |
+|---|---|---|
+| **Grok Build** | `~/.grok/config.toml` or `.grok/config.toml` | [grok-build-mock.toml](examples/grok-build-mock.toml) |
+| **Cursor** | `~/.cursor/mcp.json` or `.cursor/mcp.json` | [cursor-mcp.json](examples/cursor-mcp.json) |
+| **Claude Desktop** | `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) | [claude-desktop-mock.json](examples/claude-desktop-mock.json) |
+| **Claude Code** | `.mcp.json` in project root (or `~/.claude.json`) | [claude-code-mock.json](examples/claude-code-mock.json) |
+| **OpenCode** | `opencode.jsonc` in project root (or `~/.config/opencode/opencode.jsonc`) | [opencode-mock.jsonc](examples/opencode-mock.jsonc) |
+| **VS Code** (Copilot MCP) | `~/Library/Application Support/Code/User/mcp.json` (macOS) | [vscode-mcp.json](examples/vscode-mcp.json) |
+| **Windsurf** | `~/.codeium/windsurf/mcp_config.json` | [windsurf-mcp.json](examples/windsurf-mcp.json) |
+| **Docker** | any client's `mcpServers` block | see [Installation Options](#installation-options) |
+
+> **Grok Build** also auto-loads `.mcp.json`, `.cursor/mcp.json`, and `~/.claude.json` for compatibility. Run `grok mcp list` or `grok mcp doctor grok-image-mcp` to verify.
+
+---
+
+### Grok Build
+
+**Global** (`~/.grok/config.toml`) or **project** (`.grok/config.toml`):
+
+```toml
+[mcp_servers.grok-image-mcp]
+command = "/path/to/grok-image-mcp"
+env = { GROK_IMAGE_MOCK = "1", GROK_IMAGE_MODEL = "grok-imagine-image-quality" }
+enabled = true
+```
+
+**Live mode** — reference an env var instead of hardcoding the key:
+
+```toml
+[mcp_servers.grok-image-mcp]
+command = "/path/to/grok-image-mcp"
+env = { XAI_API_KEY = "${XAI_API_KEY}", GROK_IMAGE_MODEL = "grok-imagine-image-quality" }
+enabled = true
+```
+
+**CLI:**
+
+```bash
+grok mcp add grok-image-mcp --command /path/to/grok-image-mcp \
+  --env GROK_IMAGE_MOCK=1 GROK_IMAGE_MODEL=grok-imagine-image-quality
+grok mcp doctor grok-image-mcp
+```
+
+Full examples: [grok-build-mock.toml](examples/grok-build-mock.toml) · [grok-build-live.toml](examples/grok-build-live.toml)
+
+---
+
+### Cursor
+
+Edit `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` (project):
+
+```json
+{
+  "mcpServers": {
+    "grok-image-mcp": {
+      "command": "/path/to/grok-image-mcp",
+      "env": {
+        "GROK_IMAGE_MOCK": "1",
+        "GROK_IMAGE_MODEL": "grok-imagine-image-quality"
+      }
+    }
+  }
+}
+```
+
+Restart Cursor or reload MCP servers from settings. Example: [cursor-mcp.json](examples/cursor-mcp.json) · live: [cursor-mcp-live.json](examples/cursor-mcp-live.json)
+
+---
+
+### Claude Desktop
+
+**macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`  
+**Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "grok-image-mcp": {
+      "command": "/path/to/grok-image-mcp",
+      "env": {
+        "GROK_IMAGE_MOCK": "1",
+        "GROK_IMAGE_MODEL": "grok-imagine-image-quality"
+      }
+    }
+  }
+}
+```
+
+Restart Claude Desktop after saving. Example: [claude-desktop-mock.json](examples/claude-desktop-mock.json)
+
+---
+
+### Claude Code
+
+Place `.mcp.json` in your project root (Claude Code walks up to the git root):
+
+```json
+{
+  "mcpServers": {
+    "grok-image-mcp": {
+      "command": "/path/to/grok-image-mcp",
+      "env": {
+        "GROK_IMAGE_MOCK": "1",
+        "GROK_IMAGE_MODEL": "grok-imagine-image-quality"
+      }
+    }
+  }
+}
+```
+
+This repo includes a ready-to-use [`.mcp.json`](.mcp.json) (mock mode via `go run .`). Example: [claude-code-mock.json](examples/claude-code-mock.json)
+
+---
+
+### OpenCode
+
+Add to `opencode.jsonc` (project root or `~/.config/opencode/opencode.jsonc`):
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "grok-image-mcp": {
+      "type": "local",
+      "command": ["/path/to/grok-image-mcp"],
+      "environment": {
+        "GROK_IMAGE_MOCK": "1",
+        "GROK_IMAGE_MODEL": "grok-imagine-image-quality"
+      },
+      "enabled": true
+    }
+  }
+}
+```
+
+OpenCode uses `environment` (not `env`) and `command` as an array. Verify with `opencode mcp list`. Examples: [opencode-mock.jsonc](examples/opencode-mock.jsonc) · [opencode-live.jsonc](examples/opencode-live.jsonc)
+
+---
+
+### VS Code (GitHub Copilot MCP)
+
+Edit `~/Library/Application Support/Code/User/mcp.json` (macOS) or the equivalent on your OS:
+
+```json
+{
+  "mcpServers": {
+    "grok-image-mcp": {
+      "command": "/path/to/grok-image-mcp",
+      "env": {
+        "GROK_IMAGE_MOCK": "1",
+        "GROK_IMAGE_MODEL": "grok-imagine-image-quality"
+      }
+    }
+  }
+}
+```
+
+Example: [vscode-mcp.json](examples/vscode-mcp.json)
+
+---
+
+### Windsurf
+
+Edit `~/.codeium/windsurf/mcp_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "grok-image-mcp": {
+      "command": "/path/to/grok-image-mcp",
+      "env": {
+        "GROK_IMAGE_MOCK": "1",
+        "GROK_IMAGE_MODEL": "grok-imagine-image-quality"
+      }
+    }
+  }
+}
+```
+
+Restart Windsurf / reload MCP. Example: [windsurf-mcp.json](examples/windsurf-mcp.json)
 
 ---
 

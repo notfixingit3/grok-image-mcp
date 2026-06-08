@@ -1,0 +1,9 @@
+# Project-scoped Grok Build config — mock mode, no API key.
+# Loaded automatically when you run Grok Build inside this repo.
+# Swap command to your built binary after: go build -o grok-image-mcp .
+
+[mcp_servers.grok-image-mcp]
+command = "go"
+args = ["run", "."]
+env = { GROK_IMAGE_MOCK = "1", GROK_IMAGE_MODEL = "grok-imagine-image-quality" }
+enabled = true
