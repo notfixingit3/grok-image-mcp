@@ -46,7 +46,7 @@ go test -v ./...
 ```
 
 Verified:
-- MCP `initialize` returns `grok-image-mcp` v0.1.1
+- MCP `initialize` returns `grok-image-mcp` v0.1.2
 - `tools/list` exposes all 6 expected tools
 - `get_configuration_status` works with and without `XAI_API_KEY`
 - `get_last_image_info` works without an API key in an empty session
