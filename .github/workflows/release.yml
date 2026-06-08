@@ -38,11 +38,43 @@ jobs:
             PRERELEASE_FLAG=""
           fi
 
+          PROOF_DIR="assets/releases/${{ github.ref_name }}"
+          PROOF_ASSETS=()
+          if [ -d "$PROOF_DIR" ]; then
+            while IFS= read -r -d '' file; do
+              PROOF_ASSETS+=("$file")
+            done < <(find "$PROOF_DIR" -maxdepth 1 -type f \( -name '*.jpg' -o -name '*.jpeg' -o -name '*.png' -o -name '*.webp' -o -name 'manifest.json' \) -print0)
+          fi
+
+          NOTES_FILE=$(mktemp)
+          {
+            echo "## Test validation"
+            echo ""
+            echo "See [TEST_REPORT.md](https://github.com/${{ github.repository }}/blob/dev/TEST_REPORT.md) for full results."
+            if [ -d "$PROOF_DIR" ]; then
+              echo ""
+              echo "### Release proof images"
+              echo ""
+              echo "Live Grok Imagine output from this version (generate + edit):"
+              echo ""
+              for img in "$PROOF_DIR"/generated.* "$PROOF_DIR"/edited.*; do
+                [ -f "$img" ] || continue
+                base=$(basename "$img")
+                echo "![${{ github.ref_name }} ${base}](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${base})"
+                echo ""
+              done
+            else
+              echo ""
+              echo "_No release proof images found at \`assets/releases/${{ github.ref_name }}/\`. Run \`./scripts/generate_release_proof.sh ${{ github.ref_name }}\` before tagging._"
+            fi
+          } > "$NOTES_FILE"
+
           gh release create "${{ github.ref_name }}" \
             grok-image-mcp-linux-amd64 \
             grok-image-mcp-darwin-arm64 \
             grok-image-mcp-darwin-amd64 \
             grok-image-mcp-windows-amd64.exe \
+            "${PROOF_ASSETS[@]}" \
             $PRERELEASE_FLAG \
             --title "Release ${{ github.ref_name }}" \
-            --generate-notes
+            --notes-file "$NOTES_FILE"

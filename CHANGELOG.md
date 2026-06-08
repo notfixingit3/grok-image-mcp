@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.0-beta.1] - 2026-06-08
 
 ### Added
+- **Release proof images** — `scripts/generate_release_proof.sh` saves live generate/edit output to `assets/releases/<tag>/` for `TEST_REPORT.md` and GitHub Releases.
 - **Grok subscription OAuth** — auto-reads `~/.grok/auth.json` from `grok login` (SuperGrok / X Premium+).
 - OAuth token refresh via `https://auth.x.ai/oauth2/token` when the session is near expiry.
 - `GROK_IMAGE_AUTH` (`auto` / `oauth` / `api_key`) and `GROK_AUTH_JSON` environment variables.

@@ -70,7 +70,7 @@ unset GROK_IMAGE_MOCK
 </p>
 
 <p align="center">
-  <sub><i>Preview asset · see <a href="TEST_REPORT.md">TEST_REPORT.md</a> for test status</i></sub>
+  <sub><i>Preview asset · see <a href="TEST_REPORT.md">TEST_REPORT.md</a> for live release proof images per version</i></sub>
 </p>
 
 ---

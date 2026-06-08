@@ -6,10 +6,13 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
-if [ -z "${XAI_API_KEY:-}" ]; then
-  echo "❌ Error: XAI_API_KEY environment variable is not set."
+if [ -z "${XAI_API_KEY:-}" ] && [ ! -f "${GROK_AUTH_JSON:-$HOME/.grok/auth.json}" ]; then
+  echo "❌ Error: no live credentials found."
+  echo "   Set XAI_API_KEY or run 'grok login' (SuperGrok / X Premium+ OAuth)."
   exit 1
 fi
+
+unset GROK_IMAGE_MOCK || true
 
 mkdir -p assets generated_imgs
 

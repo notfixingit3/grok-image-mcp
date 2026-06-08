@@ -94,5 +94,11 @@ PATH_EDIT_RESPONSE=$(call_tool "edit_image" "{\"imagePath\":\"$EDITED_IMAGE\",\"
 assert_no_error "$PATH_EDIT_RESPONSE" "edit_image"
 echo "$PATH_EDIT_RESPONSE" | grep -q 'Image edited with Grok Imagine' || { echo "❌ Unexpected edit response"; exit 1; }
 
+if [ "${SAVE_RELEASE_PROOF:-1}" = "1" ]; then
+  echo ""
+  echo "📸 Saving release proof images..."
+  ./scripts/generate_release_proof.sh --reuse-latest
+fi
+
 echo ""
 echo "🎉 All integration tests passed!"
