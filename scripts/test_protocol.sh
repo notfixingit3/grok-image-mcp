@@ -20,10 +20,21 @@ call_rpc() {
 echo "🚀 Building server binary..."
 go build -o grok-image-mcp .
 
-echo "🔧 initialize"
+echo "🔧 initialize (2024-11-05)"
 RESP=$(call_rpc '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":0}')
 echo "$RESP" | grep -q '"name":"grok-image-mcp"' || exit 1
-echo "✅ initialize"
+echo "$RESP" | grep -q '"protocolVersion":"2024-11-05"' || exit 1
+echo "✅ initialize (2024-11-05)"
+
+echo "🔧 initialize (2025-06-18)"
+RESP=$(call_rpc '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":0}')
+echo "$RESP" | grep -q '"protocolVersion":"2025-06-18"' || exit 1
+echo "✅ initialize (2025-06-18)"
+
+echo "🔧 ping"
+RESP=$(call_rpc '{"jsonrpc":"2.0","method":"ping","id":100}')
+echo "$RESP" | grep -q '"result":{}' || exit 1
+echo "✅ ping"
 
 echo "🔧 tools/list"
 RESP=$(call_rpc '{"jsonrpc":"2.0","method":"tools/list","id":1}')
@@ -33,7 +44,7 @@ done
 echo "✅ tools/list"
 
 echo "🔧 get_configuration_status (unconfigured)"
-RESP=$(GROK_IMAGE_AUTH=api_key call_rpc '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_configuration_status","arguments":{}},"id":2}')
+RESP=$(GROK_IMAGE_MOCK="" GROK_IMAGE_AUTH=api_key call_rpc '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_configuration_status","arguments":{}},"id":2}')
 echo "$RESP" | grep -q 'not configured' || exit 1
 echo "✅ get_configuration_status unconfigured"
 
@@ -81,13 +92,14 @@ unset XAI_API_KEY || true
 
 echo "🔧 --version flag"
 VERSION=$(./grok-image-mcp --version)
-echo "$VERSION" | grep -q '0\.2\.0' || { echo "❌ unexpected version: $VERSION"; exit 1; }
+echo "$VERSION" | grep -q '0\.3\.0' || { echo "❌ unexpected version: $VERSION"; exit 1; }
 echo "✅ --version ($VERSION)"
 
-echo "🔧 empty prompt rejected"
+echo "🔧 empty prompt rejected with isError:true"
 export GROK_IMAGE_MOCK=1
 RESP=$(call_rpc '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"generate_image","arguments":{"prompt":"   "}},"id":9}')
 echo "$RESP" | grep -q 'prompt is required' || exit 1
+echo "$RESP" | grep -q '"isError":true' || exit 1
 echo "✅ empty prompt validation"
 
 echo "🔧 invalid aspectRatio rejected"

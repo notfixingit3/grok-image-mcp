@@ -295,3 +295,67 @@ func TestToolsListJSON(t *testing.T) {
 		t.Fatalf("tools JSON should not include generate_imagen")
 	}
 }
+
+func TestNegotiateProtocolVersion(t *testing.T) {
+	cases := []struct {
+		raw  string
+		want string
+	}{
+		{`{"protocolVersion":"2024-11-05"}`, "2024-11-05"},
+		{`{"protocolVersion":"2025-03-26"}`, "2025-03-26"},
+		{`{"protocolVersion":"2025-06-18"}`, "2025-06-18"},
+		{`{"protocolVersion":"1999-01-01"}`, DefaultProtocolVersion},
+		{`{}`, DefaultProtocolVersion},
+		{``, DefaultProtocolVersion},
+	}
+
+	for _, tc := range cases {
+		got := negotiateProtocolVersion(json.RawMessage(tc.raw))
+		if got != tc.want {
+			t.Fatalf("negotiateProtocolVersion(%s) = %q, want %q", tc.raw, got, tc.want)
+		}
+	}
+}
+
+func TestRedactSensitiveJSON(t *testing.T) {
+	raw := []byte(`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"configure_xai_token","arguments":{"apiKey":"secret-value-123","token":"tok-456","prompt":"safe-prompt"}},"id":1}`)
+	redacted := redactSensitiveJSON(raw)
+	if strings.Contains(redacted, "secret-value-123") || strings.Contains(redacted, "tok-456") {
+		t.Fatalf("expected sensitive fields to be redacted, got: %s", redacted)
+	}
+	if !strings.Contains(redacted, "[REDACTED]") {
+		t.Fatalf("expected [REDACTED] marker, got: %s", redacted)
+	}
+	if !strings.Contains(redacted, "safe-prompt") {
+		t.Fatalf("expected non-sensitive field preserved, got: %s", redacted)
+	}
+}
+
+func TestValidateModelConsistentWithEnv(t *testing.T) {
+	t.Setenv("GROK_IMAGE_MODEL", "grok-custom-env-model")
+	custom := "grok-custom-env-model"
+	if err := validateGenerateImageArgs("hello", &custom, nil, nil, nil, nil); err != nil {
+		t.Fatalf("expected env-configured model to be allowed as tool arg, got: %v", err)
+	}
+	if err := validateGenerateImageArgs("hello", nil, nil, nil, nil, nil); err != nil {
+		t.Fatalf("expected default env-configured model to pass validation, got: %v", err)
+	}
+	other := "unconfigured-other-model"
+	if err := validateGenerateImageArgs("hello", &other, nil, nil, nil, nil); err == nil {
+		t.Fatal("expected unconfigured non-standard model to be rejected")
+	}
+}
+
+func TestDownloadImageSizeLimit(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "image/png")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(make([]byte, maxImageFileBytes+10))
+	}))
+	defer server.Close()
+
+	_, _, err := downloadImage(context.Background(), server.URL)
+	if err == nil || !strings.Contains(err.Error(), "exceeds") {
+		t.Fatalf("expected size limit error from downloadImage, got: %v", err)
+	}
+}

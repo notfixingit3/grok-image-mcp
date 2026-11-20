@@ -19,7 +19,7 @@ import (
 
 const (
 	ServerName             = "grok-image-mcp"
-	ServerVersion          = "0.2.0"
+	ServerVersion          = "0.3.0"
 	XAIBaseURL             = "https://api.x.ai/v1"
 	DefaultProtocolVersion = "2025-06-18"
 	maxScannerBufferBytes  = 10 << 20 // 10 MiB max JSON-RPC line size
@@ -84,11 +84,11 @@ type InputSchema struct {
 }
 
 var (
-	lastImagePath    string
-	httpClient       = &http.Client{Timeout: 120 * time.Second}
-	logFile          *os.File
-	globalCtx        context.Context
-	mockModeEnabled  bool
+	lastImagePath   string
+	httpClient      = &http.Client{Timeout: 120 * time.Second}
+	logFile         *os.File
+	globalCtx       context.Context
+	mockModeEnabled bool
 )
 
 func main() {
