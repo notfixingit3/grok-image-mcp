@@ -5,6 +5,7 @@ WORKDIR /app
 
 COPY go.mod ./
 COPY *.go ./
+COPY assets/sample_output.png ./assets/sample_output.png
 
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o grok-image-mcp .
 

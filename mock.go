@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "embed"
 	"encoding/base64"
 	"fmt"
 	"os"
@@ -8,6 +9,9 @@ import (
 	"strings"
 	"time"
 )
+
+//go:embed assets/sample_output.png
+var embeddedSampleOutputPNG []byte
 
 // Minimal 1x1 PNG used when no sample asset is available on disk.
 var fallbackPNG = []byte{
@@ -42,6 +46,10 @@ func mockSampleImageBytes() ([]byte, string, error) {
 			return nil, "", err
 		}
 		return data, getMimeType(custom), nil
+	}
+
+	if len(embeddedSampleOutputPNG) > 0 {
+		return embeddedSampleOutputPNG, "image/png", nil
 	}
 
 	candidates := []string{

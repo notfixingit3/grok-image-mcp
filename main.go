@@ -804,9 +804,12 @@ func downloadImage(ctx context.Context, imageURL string) ([]byte, string, error)
 		return nil, "", fmt.Errorf("failed to download image: status %d", resp.StatusCode)
 	}
 
-	data, err := io.ReadAll(resp.Body)
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxImageFileBytes+1))
 	if err != nil {
 		return nil, "", err
+	}
+	if int64(len(data)) > maxImageFileBytes {
+		return nil, "", fmt.Errorf("downloaded image exceeds %d MiB limit", maxImageFileBytes>>20)
 	}
 
 	mimeType := resp.Header.Get("Content-Type")
