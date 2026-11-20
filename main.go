@@ -146,7 +146,7 @@ func main() {
 
 	for scanner.Scan() {
 		line := scanner.Bytes()
-		logMessage("Received request raw: %s", string(line))
+		logMessage("Received request raw: %s", redactSensitiveJSON(line))
 		var req JSONRPCRequest
 		if err := json.Unmarshal(line, &req); err != nil {
 			logMessage("JSON Parse error: %v", err)

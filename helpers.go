@@ -22,6 +22,58 @@ const (
 
 var xaiBaseURL = XAIBaseURL
 
+var sensitiveKeyNames = map[string]bool{
+	"apikey":        true,
+	"api_key":       true,
+	"xaiapikey":     true,
+	"xai_api_key":   true,
+	"token":         true,
+	"access_token":  true,
+	"accesstoken":   true,
+	"refresh_token": true,
+	"refreshtoken":  true,
+	"authorization": true,
+	"key":           true,
+	"secret":        true,
+	"password":      true,
+}
+
+func redactSensitiveValue(v interface{}) interface{} {
+	switch val := v.(type) {
+	case map[string]interface{}:
+		out := make(map[string]interface{}, len(val))
+		for k, item := range val {
+			if sensitiveKeyNames[strings.ToLower(strings.TrimSpace(k))] {
+				out[k] = "[REDACTED]"
+			} else {
+				out[k] = redactSensitiveValue(item)
+			}
+		}
+		return out
+	case []interface{}:
+		out := make([]interface{}, len(val))
+		for i, item := range val {
+			out[i] = redactSensitiveValue(item)
+		}
+		return out
+	default:
+		return v
+	}
+}
+
+func redactSensitiveJSON(raw []byte) string {
+	var parsed interface{}
+	if err := json.Unmarshal(raw, &parsed); err != nil {
+		return "[unparseable JSON-RPC payload]"
+	}
+	redacted := redactSensitiveValue(parsed)
+	out, err := json.Marshal(redacted)
+	if err != nil {
+		return "[redacted JSON-RPC payload]"
+	}
+	return string(out)
+}
+
 func resolveModel(customModel *string) string {
 	if customModel != nil && strings.TrimSpace(*customModel) != "" {
 		return strings.TrimSpace(*customModel)
