@@ -302,7 +302,7 @@ func getToolsList() []Tool {
 					"model": map[string]interface{}{
 						"type":        "string",
 						"description": "Optional model name. Defaults to GROK_IMAGE_MODEL environment variable or 'grok-imagine-image-quality'.",
-						"enum":        []string{"grok-imagine-image-quality", "grok-imagine-image"},
+						"enum":        allowedModels(),
 					},
 					"aspectRatio": map[string]interface{}{
 						"type":        "string",
@@ -353,7 +353,7 @@ func getToolsList() []Tool {
 					"model": map[string]interface{}{
 						"type":        "string",
 						"description": "Optional model name. Defaults to GROK_IMAGE_MODEL environment variable or 'grok-imagine-image-quality'.",
-						"enum":        []string{"grok-imagine-image-quality", "grok-imagine-image"},
+						"enum":        allowedModels(),
 					},
 					"aspectRatio": map[string]interface{}{
 						"type":        "string",
@@ -400,7 +400,7 @@ func getToolsList() []Tool {
 					"model": map[string]interface{}{
 						"type":        "string",
 						"description": "Optional model name. Defaults to GROK_IMAGE_MODEL environment variable or 'grok-imagine-image-quality'.",
-						"enum":        []string{"grok-imagine-image-quality", "grok-imagine-image"},
+						"enum":        allowedModels(),
 					},
 					"aspectRatio": map[string]interface{}{
 						"type":        "string",
