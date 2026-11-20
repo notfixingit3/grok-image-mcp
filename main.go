@@ -18,10 +18,33 @@ import (
 )
 
 const (
-	ServerName    = "grok-image-mcp"
-	ServerVersion = "0.2.0"
-	XAIBaseURL    = "https://api.x.ai/v1"
+	ServerName             = "grok-image-mcp"
+	ServerVersion          = "0.2.0"
+	XAIBaseURL             = "https://api.x.ai/v1"
+	DefaultProtocolVersion = "2025-06-18"
+	maxScannerBufferBytes  = 10 << 20 // 10 MiB max JSON-RPC line size
 )
+
+var supportedProtocolVersions = map[string]bool{
+	"2024-11-05": true,
+	"2025-03-26": true,
+	"2025-06-18": true,
+}
+
+func negotiateProtocolVersion(rawParams json.RawMessage) string {
+	if len(rawParams) > 0 {
+		var params struct {
+			ProtocolVersion string `json:"protocolVersion"`
+		}
+		if err := json.Unmarshal(rawParams, &params); err == nil {
+			v := strings.TrimSpace(params.ProtocolVersion)
+			if supportedProtocolVersions[v] {
+				return v
+			}
+		}
+	}
+	return DefaultProtocolVersion
+}
 
 type Config struct {
 	XAIAPIKey string `json:"xaiApiKey"`
@@ -119,6 +142,7 @@ func main() {
 	}()
 
 	scanner := bufio.NewScanner(os.Stdin)
+	scanner.Buffer(make([]byte, 64*1024), maxScannerBufferBytes)
 
 	for scanner.Scan() {
 		line := scanner.Bytes()
@@ -190,8 +214,9 @@ func handleRequest(req *JSONRPCRequest) {
 	logMessage("Handling method: %s", req.Method)
 	switch req.Method {
 	case "initialize":
+		protoVersion := negotiateProtocolVersion(req.Params)
 		result := map[string]interface{}{
-			"protocolVersion": "2024-11-05",
+			"protocolVersion": protoVersion,
 			"capabilities": map[string]interface{}{
 				"tools": map[string]interface{}{},
 			},
@@ -202,7 +227,11 @@ func handleRequest(req *JSONRPCRequest) {
 		}
 		sendResponse(req.ID, result)
 
-	case "notifications/initialized":
+	case "ping":
+		sendResponse(req.ID, map[string]interface{}{})
+
+	case "notifications/initialized", "notifications/cancelled":
+		logMessage("Received notification: %s", req.Method)
 
 	case "tools/list":
 		tools := getToolsList()
