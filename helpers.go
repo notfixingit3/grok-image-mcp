@@ -89,8 +89,9 @@ func getImagesDirectory() string {
 		return customDir
 	}
 
-	home, _ := os.UserHomeDir()
-	if runtime.GOOS == "windows" {
+	home, homeErr := os.UserHomeDir()
+	hasHome := homeErr == nil && strings.TrimSpace(home) != ""
+	if runtime.GOOS == "windows" && hasHome {
 		return filepath.Join(home, "Documents", "grok-images")
 	}
 
@@ -98,7 +99,7 @@ func getImagesDirectory() string {
 	if err != nil {
 		cwd = "."
 	}
-	if strings.HasPrefix(cwd, "/usr/") || strings.HasPrefix(cwd, "/opt/") || strings.HasPrefix(cwd, "/var/") {
+	if hasHome && (strings.HasPrefix(cwd, "/usr/") || strings.HasPrefix(cwd, "/opt/") || strings.HasPrefix(cwd, "/var/")) {
 		return filepath.Join(home, "grok-images")
 	}
 	return filepath.Join(cwd, "generated_imgs")

@@ -665,13 +665,17 @@ func saveConfig(key string) error {
 	if err != nil {
 		return err
 	}
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil || strings.TrimSpace(home) == "" {
+		return fmt.Errorf("home directory unavailable: %w", err)
+	}
 	globalPath := filepath.Join(home, ".grok-image-config.json")
 
 	// #nosec G301 - global config dir must be owner-only (0700)
-	_ = os.MkdirAll(filepath.Dir(globalPath), 0700)
-	// #nosec G306 - config file must be owner-only (0600)
-	return os.WriteFile(globalPath, data, 0600)
+	if err := os.MkdirAll(filepath.Dir(globalPath), 0700); err != nil {
+		return err
+	}
+	return atomicWriteFile(globalPath, data, 0600)
 }
 
 type GenerateRequest struct {
@@ -1180,7 +1184,11 @@ func runSetupWizard() {
 		os.Exit(1)
 	}
 
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil || strings.TrimSpace(home) == "" {
+		fmt.Println("🎉 Setup completed successfully!")
+		return
+	}
 	globalPath := filepath.Join(home, ".grok-image-config.json")
 	fmt.Printf("🎉 Setup completed successfully! Key saved to: %s\n", globalPath)
 }
