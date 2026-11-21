@@ -230,6 +230,7 @@ func persistGrokAuthEntry(path, scope string, entry grokAuthEntry) error {
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
+	// #nosec G117 - persisting refreshed OAuth entry back to owner-only ~/.grok/auth.json
 	updated, err := json.Marshal(entry)
 	if err != nil {
 		return err
