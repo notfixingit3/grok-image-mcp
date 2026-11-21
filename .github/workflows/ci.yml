@@ -33,5 +33,5 @@ jobs:
 
       - name: Run gosec security scan
         run: |
-          go install github.com/securego/gosec/v2/cmd/gosec@v2.22.2
+          go install github.com/securego/gosec/v2/cmd/gosec@v2.30.0
           gosec -fmt=text ./...
