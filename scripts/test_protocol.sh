@@ -6,19 +6,23 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
+echo "🚀 Building server binary..."
+go build -o grok-image-mcp .
+
 ISOLATED_HOME=$(mktemp -d)
 export HOME="$ISOLATED_HOME"
 export GROK_AUTH_JSON="$ISOLATED_HOME/no-auth.json"
 BAD_FORMAT_FILE=""
 BIG_FILE=""
-trap 'rm -rf "$ISOLATED_HOME" ${BIG_FILE:+"$BIG_FILE"} ${BAD_FORMAT_FILE:+"$BAD_FORMAT_FILE"}' EXIT
+cleanup() {
+  chmod -R u+w "$ISOLATED_HOME" 2>/dev/null || true
+  rm -rf "$ISOLATED_HOME" ${BIG_FILE:+"$BIG_FILE"} ${BAD_FORMAT_FILE:+"$BAD_FORMAT_FILE"}
+}
+trap cleanup EXIT
 
 call_rpc() {
   echo "$1" | HOME="$ISOLATED_HOME" ./grok-image-mcp
 }
-
-echo "🚀 Building server binary..."
-go build -o grok-image-mcp .
 
 echo "🔧 initialize (2024-11-05)"
 RESP=$(call_rpc '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":0}')
