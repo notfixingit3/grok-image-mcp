@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tool-level validation, filesystem, and xAI API failures now return MCP tool results with `isError: true` instead of JSON-RPC protocol errors.
 - Image save failures in `generate_image` and `edit_image` now surface explicit disk errors instead of claiming no image was returned by xAI.
 - Model validation allow-list now honors custom models configured via `GROK_IMAGE_MODEL` consistently across tool schemas, default resolution, and explicit tool arguments.
-- Bumped Go version in `go.mod` and `Dockerfile` to `1.27` and Alpine runtime base image to `3.21`.
+- Bumped Go version in `go.mod` and `Dockerfile` to `1.27` (`golang:1.27-alpine3.24`) and Alpine runtime base image to `3.24` (`alpine:3.24`).
 
 ### Security
 - Redacted `apiKey`, `token`, and other credential fields before writing raw JSON-RPC requests to `GROK_IMAGE_LOG_FILE`.
