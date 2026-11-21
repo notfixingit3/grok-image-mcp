@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-11-20
+
+### Added
+- MCP `ping` request handler and graceful handling for `notifications/cancelled`.
+- MCP protocol version negotiation supporting `2024-11-05`, `2025-03-26`, and `2025-06-18` (defaulting to `2025-06-18` for unknown versions).
+- Embedded default mock sample asset (`assets/sample_output.png`) via `go:embed` so mock mode works regardless of working directory.
+
+### Changed
+- Raised stdin `bufio.Scanner` buffer limit to 10 MiB to prevent crashes on large JSON-RPC payloads.
+- Tool-level validation, filesystem, and xAI API failures now return MCP tool results with `isError: true` instead of JSON-RPC protocol errors.
+- Image save failures in `generate_image` and `edit_image` now surface explicit disk errors instead of claiming no image was returned by xAI.
+- Model validation allow-list now honors custom models configured via `GROK_IMAGE_MODEL` consistently across tool schemas, default resolution, and explicit tool arguments.
+- Bumped Go version in `go.mod` and `Dockerfile` to `1.27` (`golang:1.27-alpine3.24`) and Alpine runtime base image to `3.24` (`alpine:3.24`).
+
+### Security
+- Redacted `apiKey`, `token`, and other credential fields before writing raw JSON-RPC requests to `GROK_IMAGE_LOG_FILE`.
+- Removed automatic reading and silent migration of `.grok-image-config.json` from the current working directory into `$HOME`.
+- Atomic file writes (temp file + chmod + sync + rename) for `~/.grok/auth.json` and `~/.grok-image-config.json`, with explicit `os.UserHomeDir()` error checks.
+- Bounded `downloadImage` response reads to 20 MiB using `io.LimitReader`.
+- Isolated `HOME` across all tests in `scripts/test_protocol.sh` so running tests never modifies real user configuration files.
+
 ## [0.2.0] - 2026-06-08
 
 Stable release promoting `v0.2.0-beta.1` from `dev`.

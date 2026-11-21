@@ -33,7 +33,7 @@ func grokAuthFilePath() string {
 		return custom
 	}
 	home, err := os.UserHomeDir()
-	if err != nil {
+	if err != nil || strings.TrimSpace(home) == "" {
 		return ""
 	}
 	return filepath.Join(home, ".grok", "auth.json")
@@ -184,6 +184,42 @@ func refreshGrokOAuthToken(ctx context.Context, entry grokAuthEntry) (grokAuthEn
 	return entry, nil
 }
 
+func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
+	dir := filepath.Dir(path)
+	tmpFile, err := os.CreateTemp(dir, ".grok-tmp-*")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmpFile.Name()
+	cleanup := true
+	defer func() {
+		if cleanup {
+			_ = os.Remove(tmpPath)
+		}
+	}()
+
+	if err := tmpFile.Chmod(perm); err != nil {
+		_ = tmpFile.Close()
+		return err
+	}
+	if _, err := tmpFile.Write(data); err != nil {
+		_ = tmpFile.Close()
+		return err
+	}
+	if err := tmpFile.Sync(); err != nil {
+		_ = tmpFile.Close()
+		return err
+	}
+	if err := tmpFile.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		return err
+	}
+	cleanup = false
+	return nil
+}
+
 func persistGrokAuthEntry(path, scope string, entry grokAuthEntry) error {
 	// #nosec G304 - path is user home or explicit env override
 	data, err := os.ReadFile(path)
@@ -194,6 +230,7 @@ func persistGrokAuthEntry(path, scope string, entry grokAuthEntry) error {
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
+	// #nosec G117 - persisting refreshed OAuth entry back to owner-only ~/.grok/auth.json
 	updated, err := json.Marshal(entry)
 	if err != nil {
 		return err
@@ -204,8 +241,8 @@ func persistGrokAuthEntry(path, scope string, entry grokAuthEntry) error {
 		return err
 	}
 	out = append(out, '\n')
-	// #nosec G306 - mirror Grok auth.json permissions
-	return os.WriteFile(path, out, 0600)
+	// #nosec G306 - mirror Grok auth.json permissions via atomic write
+	return atomicWriteFile(path, out, 0600)
 }
 
 func loadGrokOAuthToken(ctx context.Context) (string, string, error) {
@@ -241,23 +278,12 @@ func loadGrokOAuthToken(ctx context.Context) (string, string, error) {
 }
 
 func loadAPIKeyFromConfigFiles() (string, bool) {
-	var config Config
-
-	// #nosec G304 - local config file read is intentional
-	if data, err := os.ReadFile(".grok-image-config.json"); err == nil {
-		if err := json.Unmarshal(data, &config); err == nil && config.XAIAPIKey != "" {
-			home, _ := os.UserHomeDir()
-			globalPath := filepath.Join(home, ".grok-image-config.json")
-			if _, err := os.Stat(globalPath); os.IsNotExist(err) {
-				// #nosec - global path is home-dir relative, migration is safe and intentional
-				_ = os.WriteFile(globalPath, data, 0600)
-				fmt.Fprintln(os.Stderr, "[grok-image-mcp] Automatically migrated local configuration to global:", globalPath)
-			}
-			return config.XAIAPIKey, true
-		}
+	home, err := os.UserHomeDir()
+	if err != nil || strings.TrimSpace(home) == "" {
+		return "", false
 	}
 
-	home, _ := os.UserHomeDir()
+	var config Config
 	globalPath := filepath.Join(home, ".grok-image-config.json")
 	// #nosec G304 - global config file read is intentional
 	if data, err := os.ReadFile(globalPath); err == nil {

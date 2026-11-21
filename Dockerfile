@@ -1,15 +1,16 @@
 # Stage 1: Build the statically linked Go binary
-FROM golang:1.22-alpine AS builder
+FROM golang:1.27-alpine3.24 AS builder
 
 WORKDIR /app
 
 COPY go.mod ./
 COPY *.go ./
+COPY assets/sample_output.png ./assets/sample_output.png
 
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o grok-image-mcp .
 
 # Stage 2: Run in a minimal alpine container
-FROM alpine:3.19
+FROM alpine:3.24
 RUN apk --no-cache add ca-certificates
 
 COPY --from=builder /app/grok-image-mcp /usr/local/bin/grok-image-mcp

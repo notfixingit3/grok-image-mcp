@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"strings"
 )
 
@@ -18,6 +19,31 @@ var (
 		"grok-imagine-image":         true,
 	}
 )
+
+func allowedModels() []string {
+	models := []string{"grok-imagine-image-quality", "grok-imagine-image"}
+	if envModel := strings.TrimSpace(os.Getenv("GROK_IMAGE_MODEL")); envModel != "" && !validModels[envModel] {
+		models = append(models, envModel)
+	}
+	return models
+}
+
+func validateModel(model *string) error {
+	var v string
+	if model != nil {
+		v = strings.TrimSpace(*model)
+	}
+	if v == "" {
+		v = resolveModel(nil)
+	}
+	if validModels[v] {
+		return nil
+	}
+	if envModel := strings.TrimSpace(os.Getenv("GROK_IMAGE_MODEL")); envModel != "" && v == envModel {
+		return nil
+	}
+	return fmt.Errorf("invalid model: %q", v)
+}
 
 func validatePrompt(prompt string) error {
 	if strings.TrimSpace(prompt) == "" {
@@ -61,7 +87,7 @@ func validateGenerateImageArgs(prompt string, model, aspectRatio, resolution, se
 	if err := validatePrompt(prompt); err != nil {
 		return err
 	}
-	if err := validateOptionalEnum(model, "model", validModels); err != nil {
+	if err := validateModel(model); err != nil {
 		return err
 	}
 	if err := validateOptionalEnum(aspectRatio, "aspectRatio", validAspectRatios); err != nil {

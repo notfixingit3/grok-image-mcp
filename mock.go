@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "embed"
 	"encoding/base64"
 	"fmt"
 	"os"
@@ -8,6 +9,9 @@ import (
 	"strings"
 	"time"
 )
+
+//go:embed assets/sample_output.png
+var embeddedSampleOutputPNG []byte
 
 // Minimal 1x1 PNG used when no sample asset is available on disk.
 var fallbackPNG = []byte{
@@ -42,6 +46,10 @@ func mockSampleImageBytes() ([]byte, string, error) {
 			return nil, "", err
 		}
 		return data, getMimeType(custom), nil
+	}
+
+	if len(embeddedSampleOutputPNG) > 0 {
+		return embeddedSampleOutputPNG, "image/png", nil
 	}
 
 	candidates := []string{
@@ -91,7 +99,7 @@ func handleMockGenerateImage(id interface{}, prompt string, customModel, aspectR
 
 	sample, mimeType, err := mockSampleImageBytes()
 	if err != nil {
-		sendError(id, -32603, "Mock mode failed to load sample image", err.Error())
+		sendToolError(id, "Mock mode failed to load sample image", err.Error())
 		return
 	}
 
@@ -101,7 +109,7 @@ func handleMockGenerateImage(id interface{}, prompt string, customModel, aspectR
 	for i := 0; i < count; i++ {
 		filePath, b64, err := saveMockImage("generated", sample, mimeType)
 		if err != nil {
-			sendError(id, -32603, "Mock mode failed to save image", err.Error())
+			sendToolError(id, "Mock mode failed to save image", err.Error())
 			return
 		}
 		savedFiles = append(savedFiles, filePath)
@@ -144,14 +152,14 @@ func handleMockEditImage(id interface{}, imagePath, prompt string, referenceImag
 
 	_, warning, err := buildEditImageRefs(imagePath, referenceImages)
 	if err != nil {
-		sendError(id, -32603, fmt.Sprintf("Failed to prepare images for editing: %s", imagePath), err.Error())
+		sendToolError(id, fmt.Sprintf("Failed to prepare images for editing: %s", imagePath), err.Error())
 		return
 	}
 
 	// #nosec G304 - reading image path is intentional and requested by user/client
 	source, err := os.ReadFile(imagePath)
 	if err != nil {
-		sendError(id, -32603, fmt.Sprintf("Failed to read image at %s", imagePath), err.Error())
+		sendToolError(id, fmt.Sprintf("Failed to read image at %s", imagePath), err.Error())
 		return
 	}
 	mimeType := getMimeType(imagePath)
@@ -170,7 +178,7 @@ func handleMockEditImage(id interface{}, imagePath, prompt string, referenceImag
 	for i := 0; i < count; i++ {
 		filePath, b64, err := saveMockImage("edited", source, mimeType)
 		if err != nil {
-			sendError(id, -32603, "Mock mode failed to save edited image", err.Error())
+			sendToolError(id, "Mock mode failed to save edited image", err.Error())
 			return
 		}
 		savedFiles = append(savedFiles, filePath)

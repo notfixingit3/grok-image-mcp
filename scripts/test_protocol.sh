@@ -6,17 +6,39 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
-call_rpc() {
-  echo "$1" | ./grok-image-mcp
-}
-
 echo "🚀 Building server binary..."
 go build -o grok-image-mcp .
 
-echo "🔧 initialize"
+ISOLATED_HOME=$(mktemp -d)
+export HOME="$ISOLATED_HOME"
+export GROK_AUTH_JSON="$ISOLATED_HOME/no-auth.json"
+BAD_FORMAT_FILE=""
+BIG_FILE=""
+cleanup() {
+  chmod -R u+w "$ISOLATED_HOME" 2>/dev/null || true
+  rm -rf "$ISOLATED_HOME" ${BIG_FILE:+"$BIG_FILE"} ${BAD_FORMAT_FILE:+"$BAD_FORMAT_FILE"}
+}
+trap cleanup EXIT
+
+call_rpc() {
+  echo "$1" | HOME="$ISOLATED_HOME" ./grok-image-mcp
+}
+
+echo "🔧 initialize (2024-11-05)"
 RESP=$(call_rpc '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":0}')
 echo "$RESP" | grep -q '"name":"grok-image-mcp"' || exit 1
-echo "✅ initialize"
+echo "$RESP" | grep -q '"protocolVersion":"2024-11-05"' || exit 1
+echo "✅ initialize (2024-11-05)"
+
+echo "🔧 initialize (2025-06-18)"
+RESP=$(call_rpc '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":0}')
+echo "$RESP" | grep -q '"protocolVersion":"2025-06-18"' || exit 1
+echo "✅ initialize (2025-06-18)"
+
+echo "🔧 ping"
+RESP=$(call_rpc '{"jsonrpc":"2.0","method":"ping","id":100}')
+echo "$RESP" | grep -q '"result":{}' || exit 1
+echo "✅ ping"
 
 echo "🔧 tools/list"
 RESP=$(call_rpc '{"jsonrpc":"2.0","method":"tools/list","id":1}')
@@ -26,9 +48,7 @@ done
 echo "✅ tools/list"
 
 echo "🔧 get_configuration_status (unconfigured)"
-ISOLATED_HOME=$(mktemp -d)
-trap 'rm -rf "$ISOLATED_HOME" "$BIG_FILE" "$BAD_FORMAT_FILE"' EXIT
-RESP=$(HOME="$ISOLATED_HOME" GROK_IMAGE_AUTH=api_key GROK_AUTH_JSON="$ISOLATED_HOME/no-auth.json" call_rpc '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_configuration_status","arguments":{}},"id":2}')
+RESP=$(GROK_IMAGE_MOCK="" GROK_IMAGE_AUTH=api_key call_rpc '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_configuration_status","arguments":{}},"id":2}')
 echo "$RESP" | grep -q 'not configured' || exit 1
 echo "✅ get_configuration_status unconfigured"
 
@@ -76,13 +96,14 @@ unset XAI_API_KEY || true
 
 echo "🔧 --version flag"
 VERSION=$(./grok-image-mcp --version)
-echo "$VERSION" | grep -q '0\.2\.0' || { echo "❌ unexpected version: $VERSION"; exit 1; }
+echo "$VERSION" | grep -q '0\.3\.0' || { echo "❌ unexpected version: $VERSION"; exit 1; }
 echo "✅ --version ($VERSION)"
 
-echo "🔧 empty prompt rejected"
+echo "🔧 empty prompt rejected with isError:true"
 export GROK_IMAGE_MOCK=1
 RESP=$(call_rpc '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"generate_image","arguments":{"prompt":"   "}},"id":9}')
 echo "$RESP" | grep -q 'prompt is required' || exit 1
+echo "$RESP" | grep -q '"isError":true' || exit 1
 echo "✅ empty prompt validation"
 
 echo "🔧 invalid aspectRatio rejected"
@@ -109,17 +130,22 @@ echo "✅ mock configure_xai_token"
 unset GROK_IMAGE_MOCK || true
 unset XAI_API_KEY || true
 
-if [ -f "$HOME/.grok/auth.json" ]; then
-  echo "🔧 grok oauth: get_configuration_status without API key"
-  unset XAI_API_KEY || true
-  unset GROK_IMAGE_AUTH || true
-  unset GROK_AUTH_JSON || true
-  RESP=$(call_rpc '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_configuration_status","arguments":{}},"id":14}')
-  echo "$RESP" | grep -q 'Grok subscription OAuth is active' || exit 1
-  echo "✅ grok oauth configuration detected"
-else
-  echo "⏭️  skipping grok oauth test (no ~/.grok/auth.json)"
-fi
+echo "🔧 grok oauth: get_configuration_status with isolated mock auth.json"
+mkdir -p "$ISOLATED_HOME/.grok"
+cat > "$ISOLATED_HOME/.grok/auth.json" <<'EOF'
+{
+  "https://auth.x.ai::b1a00492-073a-47ea-816f-4c329264a828": {
+    "key": "mock-oauth-token",
+    "expires_at": "2099-01-01T00:00:00Z"
+  }
+}
+EOF
+unset XAI_API_KEY || true
+unset GROK_IMAGE_AUTH || true
+unset GROK_AUTH_JSON || true
+RESP=$(call_rpc '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_configuration_status","arguments":{}},"id":14}')
+echo "$RESP" | grep -q 'Grok subscription OAuth is active' || exit 1
+echo "✅ grok oauth configuration detected"
 
 echo ""
 echo "🎉 Protocol tests passed."

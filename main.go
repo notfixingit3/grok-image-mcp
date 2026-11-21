@@ -18,10 +18,33 @@ import (
 )
 
 const (
-	ServerName    = "grok-image-mcp"
-	ServerVersion = "0.2.0"
-	XAIBaseURL    = "https://api.x.ai/v1"
+	ServerName             = "grok-image-mcp"
+	ServerVersion          = "0.3.0"
+	XAIBaseURL             = "https://api.x.ai/v1"
+	DefaultProtocolVersion = "2025-06-18"
+	maxScannerBufferBytes  = 10 << 20 // 10 MiB max JSON-RPC line size
 )
+
+var supportedProtocolVersions = map[string]bool{
+	"2024-11-05": true,
+	"2025-03-26": true,
+	"2025-06-18": true,
+}
+
+func negotiateProtocolVersion(rawParams json.RawMessage) string {
+	if len(rawParams) > 0 {
+		var params struct {
+			ProtocolVersion string `json:"protocolVersion"`
+		}
+		if err := json.Unmarshal(rawParams, &params); err == nil {
+			v := strings.TrimSpace(params.ProtocolVersion)
+			if supportedProtocolVersions[v] {
+				return v
+			}
+		}
+	}
+	return DefaultProtocolVersion
+}
 
 type Config struct {
 	XAIAPIKey string `json:"xaiApiKey"`
@@ -61,11 +84,11 @@ type InputSchema struct {
 }
 
 var (
-	lastImagePath    string
-	httpClient       = &http.Client{Timeout: 120 * time.Second}
-	logFile          *os.File
-	globalCtx        context.Context
-	mockModeEnabled  bool
+	lastImagePath   string
+	httpClient      = &http.Client{Timeout: 120 * time.Second}
+	logFile         *os.File
+	globalCtx       context.Context
+	mockModeEnabled bool
 )
 
 func main() {
@@ -119,10 +142,11 @@ func main() {
 	}()
 
 	scanner := bufio.NewScanner(os.Stdin)
+	scanner.Buffer(make([]byte, 64*1024), maxScannerBufferBytes)
 
 	for scanner.Scan() {
 		line := scanner.Bytes()
-		logMessage("Received request raw: %s", string(line))
+		logMessage("Received request raw: %s", redactSensitiveJSON(line))
 		var req JSONRPCRequest
 		if err := json.Unmarshal(line, &req); err != nil {
 			logMessage("JSON Parse error: %v", err)
@@ -186,12 +210,29 @@ func sendError(id interface{}, code int, message string, data interface{}) {
 	_, _ = os.Stdout.Write([]byte("\n"))
 }
 
+func sendToolError(id interface{}, message string, detail string) {
+	text := message
+	if strings.TrimSpace(detail) != "" && detail != message {
+		text = fmt.Sprintf("%s: %s", message, detail)
+	}
+	sendResponse(id, map[string]interface{}{
+		"isError": true,
+		"content": []map[string]interface{}{
+			{
+				"type": "text",
+				"text": text,
+			},
+		},
+	})
+}
+
 func handleRequest(req *JSONRPCRequest) {
 	logMessage("Handling method: %s", req.Method)
 	switch req.Method {
 	case "initialize":
+		protoVersion := negotiateProtocolVersion(req.Params)
 		result := map[string]interface{}{
-			"protocolVersion": "2024-11-05",
+			"protocolVersion": protoVersion,
 			"capabilities": map[string]interface{}{
 				"tools": map[string]interface{}{},
 			},
@@ -202,7 +243,11 @@ func handleRequest(req *JSONRPCRequest) {
 		}
 		sendResponse(req.ID, result)
 
-	case "notifications/initialized":
+	case "ping":
+		sendResponse(req.ID, map[string]interface{}{})
+
+	case "notifications/initialized", "notifications/cancelled":
+		logMessage("Received notification: %s", req.Method)
 
 	case "tools/list":
 		tools := getToolsList()
@@ -257,7 +302,7 @@ func getToolsList() []Tool {
 					"model": map[string]interface{}{
 						"type":        "string",
 						"description": "Optional model name. Defaults to GROK_IMAGE_MODEL environment variable or 'grok-imagine-image-quality'.",
-						"enum":        []string{"grok-imagine-image-quality", "grok-imagine-image"},
+						"enum":        allowedModels(),
 					},
 					"aspectRatio": map[string]interface{}{
 						"type":        "string",
@@ -308,7 +353,7 @@ func getToolsList() []Tool {
 					"model": map[string]interface{}{
 						"type":        "string",
 						"description": "Optional model name. Defaults to GROK_IMAGE_MODEL environment variable or 'grok-imagine-image-quality'.",
-						"enum":        []string{"grok-imagine-image-quality", "grok-imagine-image"},
+						"enum":        allowedModels(),
 					},
 					"aspectRatio": map[string]interface{}{
 						"type":        "string",
@@ -355,7 +400,7 @@ func getToolsList() []Tool {
 					"model": map[string]interface{}{
 						"type":        "string",
 						"description": "Optional model name. Defaults to GROK_IMAGE_MODEL environment variable or 'grok-imagine-image-quality'.",
-						"enum":        []string{"grok-imagine-image-quality", "grok-imagine-image"},
+						"enum":        allowedModels(),
 					},
 					"aspectRatio": map[string]interface{}{
 						"type":        "string",
@@ -411,11 +456,11 @@ func handleToolCall(id interface{}, toolName string, arguments json.RawMessage) 
 			APIKey string `json:"apiKey"`
 		}
 		if err := json.Unmarshal(arguments, &args); err != nil {
-			sendError(id, -32602, "Invalid arguments", err.Error())
+			sendToolError(id, "Invalid arguments", err.Error())
 			return
 		}
-		if args.APIKey == "" {
-			sendError(id, -32602, "API key is required", nil)
+		if strings.TrimSpace(args.APIKey) == "" {
+			sendToolError(id, "API key is required", "")
 			return
 		}
 		ctx := globalCtx
@@ -425,12 +470,12 @@ func handleToolCall(id interface{}, toolName string, arguments json.RawMessage) 
 		if !isMockMode() {
 			statusCode, bodyBytes, err := validateAPIKey(ctx, args.APIKey)
 			if err != nil {
-				sendError(id, -32603, formatValidationFailure(statusCode, bodyBytes), string(bodyBytes))
+				sendToolError(id, formatValidationFailure(statusCode, bodyBytes), string(bodyBytes))
 				return
 			}
 		}
 		if err := saveConfig(args.APIKey); err != nil {
-			sendError(id, -32603, "Failed to save configuration", err.Error())
+			sendToolError(id, "Failed to save configuration", err.Error())
 			return
 		}
 		sendResponse(id, map[string]interface{}{
@@ -525,23 +570,23 @@ func handleToolCall(id interface{}, toolName string, arguments json.RawMessage) 
 			ServiceTier     *string  `json:"serviceTier"`
 		}
 		if err := json.Unmarshal(arguments, &args); err != nil {
-			sendError(id, -32602, "Invalid arguments", err.Error())
+			sendToolError(id, "Invalid arguments", err.Error())
 			return
 		}
 		if err := validateGenerateImageArgs(args.Prompt, args.Model, args.AspectRatio, args.Resolution, args.ServiceTier, args.NumberOfImages); err != nil {
-			sendError(id, -32602, err.Error(), nil)
+			sendToolError(id, err.Error(), "")
 			return
 		}
 		if lastImagePath == "" {
-			sendError(id, -32603, "No previous image found. Please generate or edit an image first.", nil)
+			sendToolError(id, "No previous image found. Please generate or edit an image first.", "")
 			return
 		}
 		if _, err := os.Stat(lastImagePath); os.IsNotExist(err) {
-			sendError(id, -32603, fmt.Sprintf("Last image file not found at: %s. Please generate a new image.", lastImagePath), nil)
+			sendToolError(id, fmt.Sprintf("Last image file not found at: %s. Please generate a new image.", lastImagePath), "")
 			return
 		}
 		if !isMockMode() && apiKey == "" {
-			sendError(id, -32603, "xAI credentials not configured. Run `grok login` for subscription OAuth, or use configure_xai_token.", nil)
+			sendToolError(id, "xAI credentials not configured. Run `grok login` for subscription OAuth, or use configure_xai_token.", "")
 			return
 		}
 		if isMockMode() {
@@ -555,7 +600,7 @@ func handleToolCall(id interface{}, toolName string, arguments json.RawMessage) 
 	switch toolName {
 	case "generate_image":
 		if !isMockMode() && apiKey == "" {
-			sendError(id, -32603, "xAI credentials not configured. Run `grok login` for subscription OAuth, or use configure_xai_token.", nil)
+			sendToolError(id, "xAI credentials not configured. Run `grok login` for subscription OAuth, or use configure_xai_token.", "")
 			return
 		}
 		var args struct {
@@ -567,11 +612,11 @@ func handleToolCall(id interface{}, toolName string, arguments json.RawMessage) 
 			ServiceTier    *string `json:"serviceTier"`
 		}
 		if err := json.Unmarshal(arguments, &args); err != nil {
-			sendError(id, -32602, "Invalid arguments", err.Error())
+			sendToolError(id, "Invalid arguments", err.Error())
 			return
 		}
 		if err := validateGenerateImageArgs(args.Prompt, args.Model, args.AspectRatio, args.Resolution, args.ServiceTier, args.NumberOfImages); err != nil {
-			sendError(id, -32602, err.Error(), nil)
+			sendToolError(id, err.Error(), "")
 			return
 		}
 		if isMockMode() {
@@ -582,7 +627,7 @@ func handleToolCall(id interface{}, toolName string, arguments json.RawMessage) 
 
 	case "edit_image":
 		if !isMockMode() && apiKey == "" {
-			sendError(id, -32603, "xAI credentials not configured. Run `grok login` for subscription OAuth, or use configure_xai_token.", nil)
+			sendToolError(id, "xAI credentials not configured. Run `grok login` for subscription OAuth, or use configure_xai_token.", "")
 			return
 		}
 		var args struct {
@@ -596,11 +641,11 @@ func handleToolCall(id interface{}, toolName string, arguments json.RawMessage) 
 			ServiceTier     *string  `json:"serviceTier"`
 		}
 		if err := json.Unmarshal(arguments, &args); err != nil {
-			sendError(id, -32602, "Invalid arguments", err.Error())
+			sendToolError(id, "Invalid arguments", err.Error())
 			return
 		}
 		if err := validateEditImageArgs(args.ImagePath, args.Prompt, args.Model, args.AspectRatio, args.Resolution, args.ServiceTier, args.NumberOfImages); err != nil {
-			sendError(id, -32602, err.Error(), nil)
+			sendToolError(id, err.Error(), "")
 			return
 		}
 		if isMockMode() {
@@ -620,13 +665,17 @@ func saveConfig(key string) error {
 	if err != nil {
 		return err
 	}
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil || strings.TrimSpace(home) == "" {
+		return fmt.Errorf("home directory unavailable: %w", err)
+	}
 	globalPath := filepath.Join(home, ".grok-image-config.json")
 
 	// #nosec G301 - global config dir must be owner-only (0700)
-	_ = os.MkdirAll(filepath.Dir(globalPath), 0700)
-	// #nosec G306 - config file must be owner-only (0600)
-	return os.WriteFile(globalPath, data, 0600)
+	if err := os.MkdirAll(filepath.Dir(globalPath), 0700); err != nil {
+		return err
+	}
+	return atomicWriteFile(globalPath, data, 0600)
 }
 
 type GenerateRequest struct {
@@ -755,9 +804,12 @@ func downloadImage(ctx context.Context, imageURL string) ([]byte, string, error)
 		return nil, "", fmt.Errorf("failed to download image: status %d", resp.StatusCode)
 	}
 
-	data, err := io.ReadAll(resp.Body)
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxImageFileBytes+1))
 	if err != nil {
 		return nil, "", err
+	}
+	if int64(len(data)) > maxImageFileBytes {
+		return nil, "", fmt.Errorf("downloaded image exceeds %d MiB limit", maxImageFileBytes>>20)
 	}
 
 	mimeType := resp.Header.Get("Content-Type")
@@ -797,7 +849,9 @@ func saveImageResult(ctx context.Context, imageData ImageData, prefix string) (s
 
 	imagesDir := getImagesDirectory()
 	// #nosec G301 - generated images folder should be user-browsable (0755)
-	_ = os.MkdirAll(imagesDir, 0755)
+	if err := os.MkdirAll(imagesDir, 0755); err != nil {
+		return "", "", err
+	}
 
 	timestamp := time.Now().Format("20060102-150405")
 	randomID := randomSuffix()
@@ -835,20 +889,22 @@ func handleGenerateImage(id interface{}, apiKey, prompt string, customModel, asp
 	imageResp, statusCode, bodyBytes, err := doXAIRequest(ctx, apiKey, "/images/generations", reqPayload)
 	if err != nil {
 		if statusCode != 0 {
-			sendError(id, -32603, err.Error(), string(bodyBytes))
+			sendToolError(id, err.Error(), string(bodyBytes))
 		} else {
-			sendError(id, -32603, err.Error(), nil)
+			sendToolError(id, err.Error(), "")
 		}
 		return
 	}
 
 	content := []map[string]interface{}{}
 	savedFiles := []string{}
+	var saveErrors []string
 
 	for _, item := range imageResp.Data {
 		filePath, b64, err := saveImageResult(ctx, item, "generated")
 		if err != nil {
 			logMessage("Failed to save image: %v", err)
+			saveErrors = append(saveErrors, err.Error())
 			continue
 		}
 		savedFiles = append(savedFiles, filePath)
@@ -866,6 +922,11 @@ func handleGenerateImage(id interface{}, apiKey, prompt string, customModel, asp
 		})
 	}
 
+	if len(savedFiles) == 0 && len(saveErrors) > 0 {
+		sendToolError(id, "Failed to save generated image(s) to disk", strings.Join(saveErrors, "; "))
+		return
+	}
+
 	statusText := fmt.Sprintf("🎨 Image generated with Grok Imagine (%s)!\n\nPrompt: \"%s\"", model, prompt)
 	if aspectRatio != nil && *aspectRatio != "" {
 		statusText += fmt.Sprintf("\nAspect Ratio: %s", *aspectRatio)
@@ -878,6 +939,9 @@ func handleGenerateImage(id interface{}, apiKey, prompt string, customModel, asp
 	}
 	if serviceTier != nil && *serviceTier != "" {
 		statusText += fmt.Sprintf("\nService Tier: %s", *serviceTier)
+	}
+	if len(saveErrors) > 0 {
+		statusText += fmt.Sprintf("\n\n⚠️ Failed to save %d image(s): %s", len(saveErrors), strings.Join(saveErrors, "; "))
 	}
 
 	if len(savedFiles) > 0 {
@@ -906,7 +970,7 @@ func handleEditImage(id interface{}, apiKey, imagePath, prompt string, reference
 
 	allImages, warning, err := buildEditImageRefs(imagePath, referenceImages)
 	if err != nil {
-		sendError(id, -32603, fmt.Sprintf("Failed to prepare images for editing: %s", imagePath), err.Error())
+		sendToolError(id, fmt.Sprintf("Failed to prepare images for editing: %s", imagePath), err.Error())
 		return
 	}
 
@@ -934,20 +998,22 @@ func handleEditImage(id interface{}, apiKey, imagePath, prompt string, reference
 	imageResp, statusCode, bodyBytes, err := doXAIRequest(ctx, apiKey, "/images/edits", reqPayload)
 	if err != nil {
 		if statusCode != 0 {
-			sendError(id, -32603, err.Error(), string(bodyBytes))
+			sendToolError(id, err.Error(), string(bodyBytes))
 		} else {
-			sendError(id, -32603, err.Error(), nil)
+			sendToolError(id, err.Error(), "")
 		}
 		return
 	}
 
 	content := []map[string]interface{}{}
 	savedFiles := []string{}
+	var saveErrors []string
 
 	for _, item := range imageResp.Data {
 		filePath, b64, err := saveImageResult(ctx, item, "edited")
 		if err != nil {
 			logMessage("Failed to save image: %v", err)
+			saveErrors = append(saveErrors, err.Error())
 			continue
 		}
 		savedFiles = append(savedFiles, filePath)
@@ -965,9 +1031,17 @@ func handleEditImage(id interface{}, apiKey, imagePath, prompt string, reference
 		})
 	}
 
+	if len(savedFiles) == 0 && len(saveErrors) > 0 {
+		sendToolError(id, "Failed to save edited image(s) to disk", strings.Join(saveErrors, "; "))
+		return
+	}
+
 	statusText := fmt.Sprintf("🎨 Image edited with Grok Imagine (%s)!\n\nOriginal: %s\nEdit prompt: \"%s\"", model, imagePath, prompt)
 	if warning != "" {
 		statusText += fmt.Sprintf("\n\n⚠️ %s", warning)
+	}
+	if len(saveErrors) > 0 {
+		statusText += fmt.Sprintf("\n\n⚠️ Failed to save %d image(s): %s", len(saveErrors), strings.Join(saveErrors, "; "))
 	}
 	if len(referenceImages) > 0 {
 		statusText += fmt.Sprintf("\nReference images provided: %d", len(referenceImages))
@@ -1113,7 +1187,11 @@ func runSetupWizard() {
 		os.Exit(1)
 	}
 
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil || strings.TrimSpace(home) == "" {
+		fmt.Println("🎉 Setup completed successfully!")
+		return
+	}
 	globalPath := filepath.Join(home, ".grok-image-config.json")
 	fmt.Printf("🎉 Setup completed successfully! Key saved to: %s\n", globalPath)
 }
